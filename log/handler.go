@@ -9,12 +9,30 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 )
 
 type Handler interface {
 	Handle(record *Record) error
+}
+
+type ThreadSafeHandler struct {
+	handler Handler
+	sync.Mutex
+}
+
+func NewThreadSafeHandler(handler Handler) Handler {
+	return &ThreadSafeHandler{
+		handler: handler,
+	}
+}
+
+func (handler *ThreadSafeHandler) Handle(record *Record) error {
+	handler.Lock()
+	defer handler.Unlock()
+	return handler.handler.Handle(record)
 }
 
 type Rotator interface {
@@ -197,7 +215,7 @@ func (rotator *TimeRotator) getFilesToDelete() []string {
 
 		if name[:plen] == prefix {
 			suffix := name[plen:]
-			if ok, _ :=regexp.MatchString(rotator.extMatch, suffix); ok {
+			if ok, _ := regexp.MatchString(rotator.extMatch, suffix); ok {
 				result = append(result, filepath.Join(dirName, name))
 			}
 		}

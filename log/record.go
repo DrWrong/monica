@@ -3,10 +3,18 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"runtime"
 	"text/template"
 	"time"
 )
+
+var srcFile string
+
+func init() {
+	_, file, _, _ := runtime.Caller(1)
+	srcFile = path.Join(path.Dir(file), "logger.go")
+}
 
 type Level uint8
 
@@ -23,8 +31,6 @@ func (level Level) String() string {
 		return "error"
 	case FatalLevel:
 		return "fatal"
-	case PanicLevel:
-		return "panic"
 	}
 
 	return "unknown"
@@ -85,11 +91,22 @@ func NewRecord(level Level, message string) *Record {
 		Message: message,
 	}
 	record.Time = time.Now()
-	pc, filename, line, _ := runtime.Caller(2)
-	record.FileName = filename
-	record.LineNo = line
-	if function := runtime.FuncForPC(pc); function != nil {
-		record.FuncName = function.Name()
+	var pcs [2]uintptr
+	numStack := runtime.Callers(4, pcs[:])
+	for i := 0; i < numStack; i+=1 {
+		function := runtime.FuncForPC(pcs[i])
+		if function == nil {
+			break
+		}
+		filename, line := function.FileLine(pcs[i])
+		if filename == srcFile {
+			continue
+		} else {
+			record.FileName = filename
+			record.LineNo = line
+			record.FuncName = function.Name()
+			break
+		}
 	}
 
 	return record

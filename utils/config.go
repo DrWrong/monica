@@ -32,7 +32,7 @@ type ServerOption struct {
 // get a sigleton of gloabl configuration
 // it will panic if global configer is null
 func GetGlobalServerOption() *ServerOption {
-	once.Do(initGloablServerOption())
+	once.Do(initGloablServerOption)
 	return globalServerOption
 }
 

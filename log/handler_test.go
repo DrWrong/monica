@@ -5,12 +5,10 @@ import (
 	"time"
 )
 
-const formatter = `{{.Time.String }}  {{.Level.String }} {{.FileName }} {{.FuncName}} {{ .LineNo}} {{ .Message }}
-`
 
 func TestFileHanler(t *testing.T) {
 	handler, err := NewFileHandler(
-		"hanlder_test.log", formatter)
+		"/dev/stdout", formatter)
 	if err != nil {
 		t.Error(err)
 	}
