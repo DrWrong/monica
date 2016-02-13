@@ -32,3 +32,10 @@ func TestGetLogger(t *testing.T) {
 	t.Log(logger.loggerName)
 	logger.Debug("test get logger")
 }
+
+func TestFileLogger(t *testing.T) {
+	ConfigFromFile("log.yaml")
+	logger := GetLogger("/monica/filelogger")
+	t.Log(logger.loggerName)
+	logger.Debug("test file logger")
+}

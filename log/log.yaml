@@ -1,0 +1,13 @@
+  log:
+    handlers:
+      - name: yamlfileHandler
+        type: FileHandler
+        args:
+          baseFileName: log_file.log
+          formatter: "{{.Time.String }}  {{.Level.String }} {{.FileName }} {{.FuncName}} {{ .LineNo}} {{ .Message }} \n"
+    loggers:
+      - name: /monica/filelogger
+        handlers:
+          - yamlfileHandler
+        level: debug
+        propagte: false

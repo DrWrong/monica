@@ -1,6 +1,8 @@
 package log
 
 import (
+	"fmt"
+	"github.com/DrWrong/monica/config"
 	"strconv"
 )
 
@@ -63,6 +65,53 @@ func InitLogger(handlerOptions []*HandlerOption, loggerOption []*LoggerOption) {
 	}
 }
 
+func InitLoggerFromConfigure(configure config.Configer) {
+	handlersConfig, err := configure.Maps("log::handlers")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("%+v", handlersConfig)
+	handlerOptions := make([]*HandlerOption, 0, len(handlersConfig))
+	for _, config := range handlersConfig {
+		args := config["args"].(map[string]interface{})
+		argsConvert := make(map[string]string, len(args))
+		for key, value := range args {
+			argsConvert[key] = value.(string)
+		}
+		handlerOptions = append(handlerOptions, &HandlerOption{
+			Name: config["name"].(string),
+			Type: config["type"].(string),
+			Args: argsConvert,
+		})
+	}
+
+	loggerConfig, err := configure.Maps("log::loggers")
+	if err != nil {
+		panic(err)
+	}
+	loggerOptions := make([]*LoggerOption, 0, len(loggerConfig))
+	for _, config := range loggerConfig {
+		level, _ := ParseLevel(config["level"].(string))
+		handlers := config["handlers"].([]interface{})
+		handlerNames := make([]string, 0, len(handlers))
+		for _, handler := range handlers {
+			handlerNames = append(handlerNames, handler.(string))
+		}
+		handlerNames = append(handlerNames)
+		loggerOptions = append(loggerOptions, &LoggerOption{
+			Name:         config["name"].(string),
+			HandlerNames: handlerNames,
+			Level:        level,
+			Propagte:     config["propagte"].(bool),
+		})
+	}
+	InitLogger(handlerOptions, loggerOptions)
+}
+
+func ConfigFromFile(filename string) {
+	configure := config.NewYamlConfig(filename)
+	InitLoggerFromConfigure(configure)
+}
 
 func init() {
 	handlersMap = make(map[string]Handler, 0)

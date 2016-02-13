@@ -23,6 +23,7 @@ type Configer interface {
 	Maps(key string) ([]map[string]interface{}, error)
 }
 
+
 // some server side options
 type ServerOption struct {
 	ServerPort int
