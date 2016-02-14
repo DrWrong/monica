@@ -1,7 +1,8 @@
 package core
 
 import (
-	"monica/core/inject"
+	"github.com/DrWrong/monica/core/inject"
+	"net/http"
 )
 
 type Handler interface{}
@@ -14,6 +15,7 @@ type Context struct {
 	index    int
 	Req      *http.Request
 	Resp     http.ResponseWriter
+	Kwargs   map[string]string
 	// Data is used for a json response which
 	Data map[string]interface{}
 	// a bool value which control wheather will go on processing
