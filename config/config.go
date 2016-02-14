@@ -23,11 +23,11 @@ type Configer interface {
 	Maps(key string) ([]map[string]interface{}, error)
 }
 
-
 // some server side options
 type ServerOption struct {
 	ServerPort int
 	ServerMode string
+	URLPrefix  string
 }
 
 // get a sigleton of gloabl configuration
@@ -49,4 +49,7 @@ func initGloablServerOption() {
 	if mode := GlobalConfiger.String("server::servermode"); mode == "http" || mode == "fastcgi" {
 		globalServerOption.ServerMode = mode
 	}
+
+	globalServerOption.URLPrefix = GlobalConfiger.String("server::urlPrefix")
+
 }
