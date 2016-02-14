@@ -1,9 +1,11 @@
 package log
 
 import (
-	"fmt"
-	"github.com/DrWrong/monica/config"
+	"os"
+	"path"
 	"strconv"
+
+	"github.com/DrWrong/monica/config"
 )
 
 var (
@@ -21,10 +23,12 @@ func (option *HandlerOption) InitHandler() {
 	switch option.Type {
 	case "FileHandler":
 		baseFileName := option.Args["baseFileName"]
+		baseFileName = path.Join(os.Getenv("MONICA_RUNDIR"), baseFileName)
 		formatter := option.Args["formatter"]
 		handler, _ = NewFileHandler(baseFileName, formatter)
 	case "TimeRotatingFileHandler":
 		baseFileName := option.Args["baseFileName"]
+		baseFileName = path.Join(os.Getenv("MONICA_RUNDIR"), baseFileName)
 		formatter := option.Args["formatter"]
 		when := option.Args["when"]
 		backupCount, _ := strconv.Atoi(option.Args["backupCount"])
@@ -70,7 +74,6 @@ func InitLoggerFromConfigure(configure config.Configer) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("%+v", handlersConfig)
 	handlerOptions := make([]*HandlerOption, 0, len(handlersConfig))
 	for _, config := range handlersConfig {
 		args := config["args"].(map[string]interface{})

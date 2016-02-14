@@ -1,0 +1,22 @@
+---
+default:
+  mysql:
+    default: "domob:domob@tcp(10.0.0.200:3306)/sos?charset=utf8"
+  runmode: dev
+  runDir: /Users/drwrong/mywork/monica_goroot/src/github.com/DrWrong/monica/example
+server:
+    serverport: 8200
+    servermode: http
+log:
+  handlers:
+    - name: yamlfileHandler
+      type: FileHandler
+      args:
+        baseFileName: "log/log_file.log"
+        formatter: "{{.Time.String }}  {{.Level.String }} {{.FileName }} {{.FuncName}} {{ .LineNo}} {{ .Message }} \n"
+  loggers:
+    - name: /
+      handlers:
+        - yamlfileHandler
+      level: debug
+      propagte: false

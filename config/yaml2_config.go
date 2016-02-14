@@ -38,7 +38,7 @@ func (config *YamlConfig) String(nodeName string) string {
 	node := config.getNode(nodeName)
 	res, err := node.String()
 	if err != nil {
-		panic(err)
+		return ""
 	}
 	return res
 }

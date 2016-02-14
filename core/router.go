@@ -2,8 +2,10 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -31,16 +33,18 @@ func (node *UrlNode) Process(handlers []Handler, kwargs map[string]string) func(
 func GetProcessor(urlPath string) (func(http.ResponseWriter, *http.Request), error) {
 	handlers := make([]Handler, 0, 0)
 	kwargs := make(map[string]string, 0)
-	node := getNode(root, urlPath, handlers, kwargs)
+	node := getNode(root, urlPath, &handlers, kwargs)
 	if node == nil {
 		return nil, errors.New("404 Not Found")
 	}
+	fmt.Printf("%+v", handlers)
 	return node.Process(handlers, kwargs), nil
 }
 
-func getNode(topNode *UrlNode, urlPath string, handlers []Handler, kwargs map[string]string) *UrlNode {
+func getNode(topNode *UrlNode, urlPath string, handlers *[]Handler, kwargs map[string]string) *UrlNode {
 	if topNode.Pattern.MatchString(urlPath) {
-		handlers = append(handlers, topNode.Filters...)
+		fmt.Printf("examin path %s, using %+v\n", urlPath, topNode)
+		*handlers = append(*handlers, topNode.Filters...)
 		matchers := topNode.Pattern.FindStringSubmatch(urlPath)
 		for i, name := range topNode.Pattern.SubexpNames() {
 			if i != 0 {
@@ -49,7 +53,11 @@ func getNode(topNode *UrlNode, urlPath string, handlers []Handler, kwargs map[st
 		}
 		urlPath = topNode.Pattern.ReplaceAllString(urlPath, "")
 		if urlPath == "" {
-			handlers = append(handlers, topNode.Handler)
+			if topNode.Handler == nil {
+				return nil
+			}
+
+			*handlers = append(*handlers, topNode.Handler)
 			return topNode
 		}
 		for _, subNode := range topNode.SubNodes {
@@ -66,11 +74,29 @@ func AddMiddleware(handlers ...Handler) {
 	root.Filters = append(root.Filters, handlers...)
 }
 
-func Group(pattern string, fn func(), h ...Handler) {
+func DebugRoute() {
+	debugRoute(0, root)
+}
+
+func debugRoute(level int, node *UrlNode) {
+	fmt.Printf(
+		"%s pattern: %+v handler: %+v filters: %+v \n",
+		strings.Repeat("\t", level),
+		node.Pattern,
+		node.Handler,
+		node.Filters,
+	)
+	for _, subNode := range node.SubNodes {
+		debugRoute(level+1, subNode)
+	}
+}
+
+func Group(pattern string, fn func(), handler Handler, filters ...Handler) {
 	node := &UrlNode{
 		Pattern: regexp.MustCompile(pattern),
-		Filters: h,
 		parent:  currentNode,
+		Handler: handler,
+		Filters: filters,
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, node)
 	currentNode = node

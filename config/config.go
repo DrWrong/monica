@@ -10,6 +10,10 @@ var (
 	once               sync.Once
 )
 
+func InitYamlGlobalConfiger(filename string) {
+	GlobalConfiger = NewYamlConfig(filename)
+}
+
 type Configer interface {
 	String(key string) string
 	Strings(key string) []string
