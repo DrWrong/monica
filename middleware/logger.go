@@ -13,7 +13,7 @@ func LoggerHandler() core.Handler {
 		t := time.Now()
 		ctx.Next()
 		logger.Infof("%s %dms",
-			ctx.Req.URL.String(),
+			ctx.Request.URL.String(),
 			int(time.Since(t).Seconds()*1000),
 		)
 	}

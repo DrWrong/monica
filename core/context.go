@@ -13,13 +13,36 @@ type Context struct {
 	inject.Injector
 	handlers []Handler
 	index    int
-	Req      *http.Request
-	Resp     http.ResponseWriter
-	Kwargs   map[string]string
+	*http.Request
+	Resp          http.ResponseWriter
+	CookieSupport bool
+	Kwargs        map[string]string
 	// Data is used for a json response which
 	Data map[string]interface{}
 	// a bool value which control wheather will go on processing
 	stopProcess bool
+}
+
+// get Cookie
+// try get cookie from cookie itself
+// if cookie not support for example: app rest then use query
+func (c *Context) GetCookie(name string) string {
+	if c.CookieSupport {
+		sessionCookie, err := c.Cookie(name)
+		if err != nil {
+			return ""
+		}
+		return sessionCookie.Value
+	}
+	return c.FormValue(name)
+}
+
+func (c *Context) SetCookie(cookie *http.Cookie) {
+	if c.CookieSupport {
+		http.SetCookie(c.Resp, cookie)
+	} else {
+		c.Data[cookie.Name] = cookie.Value
+	}
 }
 
 // stop process
@@ -50,9 +73,10 @@ func (c *Context) run() {
 
 func NewContext(resp http.ResponseWriter, req *http.Request) *Context {
 	c := &Context{
-		Injector: inject.New(),
-		Req:      req,
-		Resp:     resp,
+		Injector:      inject.New(),
+		Request:       req,
+		Resp:          resp,
+		CookieSupport: true,
 	}
 	c.Map(c)
 	return c
