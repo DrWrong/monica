@@ -6,72 +6,76 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/DrWrong/monica/log"
 )
 
 var (
 	root        *UrlNode
 	currentNode *UrlNode
+	logger      *log.MonicaLogger
 )
 
 type UrlNode struct {
 	SubNodes []*UrlNode
 	parent   *UrlNode
 	Pattern  *regexp.Regexp
-	Handler  Handler
-	Filters  []Handler
+	Handlers []Handler
 }
 
-func (node *UrlNode) Process(handlers []Handler, kwargs map[string]string) func(http.ResponseWriter, *http.Request) {
+func (node *UrlNode) isLeaf() bool {
+	return len(node.SubNodes) == 0
+}
+
+func newProcessor(handlers []Handler, kwargs map[string]string) func(http.ResponseWriter, *http.Request) {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		c := NewContext(resp, req)
 		c.handlers = handlers
 		c.Kwargs = kwargs
 		c.run()
 	}
+
 }
 
 func GetProcessor(urlPath string) (func(http.ResponseWriter, *http.Request), error) {
-	handlers := make([]Handler, 0, 0)
 	kwargs := make(map[string]string, 0)
-	node := getNode(root, urlPath, &handlers, kwargs)
-	if node == nil {
-		return nil, errors.New("404 Not Found")
+	handlers := root.Handlers
+	log.Debugf("%+v", root.Handlers)
+
+	for _, node := range root.SubNodes {
+		if urlDispatcher(node, urlPath, &handlers, kwargs) {
+			return newProcessor(handlers, kwargs), nil
+		}
 	}
-	fmt.Printf("%+v", handlers)
-	return node.Process(handlers, kwargs), nil
+
+	return nil, errors.New("404 not found")
 }
 
-func getNode(topNode *UrlNode, urlPath string, handlers *[]Handler, kwargs map[string]string) *UrlNode {
+func urlDispatcher(topNode *UrlNode, urlPath string, handlers *[]Handler, kwargs map[string]string) bool {
 	if topNode.Pattern.MatchString(urlPath) {
-		fmt.Printf("examin path %s, using %+v\n", urlPath, topNode)
-		*handlers = append(*handlers, topNode.Filters...)
+		*handlers = append(*handlers, topNode.Handlers...)
 		matchers := topNode.Pattern.FindStringSubmatch(urlPath)
 		for i, name := range topNode.Pattern.SubexpNames() {
 			if i != 0 {
 				kwargs[name] = matchers[i]
 			}
 		}
-		urlPath = topNode.Pattern.ReplaceAllString(urlPath, "")
-		if urlPath == "" {
-			if topNode.Handler == nil {
-				return nil
-			}
-
-			*handlers = append(*handlers, topNode.Handler)
-			return topNode
+		if topNode.isLeaf() {
+			return true
 		}
+
+		urlPath = topNode.Pattern.ReplaceAllString(urlPath, "")
 		for _, subNode := range topNode.SubNodes {
-			node := getNode(subNode, urlPath, handlers, kwargs)
-			if node != nil {
-				return node
+			if urlDispatcher(subNode, urlPath, handlers, kwargs) {
+				return true
 			}
 		}
 	}
-	return nil
+	return false
 }
 
 func AddMiddleware(handlers ...Handler) {
-	root.Filters = append(root.Filters, handlers...)
+	root.Handlers = append(root.Handlers, handlers...)
 }
 
 func DebugRoute() {
@@ -80,23 +84,21 @@ func DebugRoute() {
 
 func debugRoute(level int, node *UrlNode) {
 	fmt.Printf(
-		"%s pattern: %+v handler: %+v filters: %+v \n",
+		"%s pattern: %+v handlers: %+v \n",
 		strings.Repeat("\t", level),
 		node.Pattern,
-		node.Handler,
-		node.Filters,
+		node.Handlers,
 	)
 	for _, subNode := range node.SubNodes {
 		debugRoute(level+1, subNode)
 	}
 }
 
-func Group(pattern string, fn func(), handler Handler, filters ...Handler) {
+func Group(pattern string, fn func(), handlers ...Handler) {
 	node := &UrlNode{
-		Pattern: regexp.MustCompile(pattern),
-		parent:  currentNode,
-		Handler: handler,
-		Filters: filters,
+		Pattern:  regexp.MustCompile(pattern),
+		parent:   currentNode,
+		Handlers: handlers,
 	}
 	currentNode.SubNodes = append(currentNode.SubNodes, node)
 	currentNode = node
@@ -110,16 +112,12 @@ func Handle(pattern string, handlers ...Handler) {
 		parent:  currentNode,
 		Pattern: regexp.MustCompile(pattern),
 	}
-	node.Handler = handlers[len(handlers)-1]
-	if len(handlers) > 1 {
-		node.Filters = handlers[:len(handlers)-1]
-	}
+	node.Handlers = handlers
 	currentNode.SubNodes = append(currentNode.SubNodes, node)
 }
 
 func init() {
-	root = &UrlNode{
-		Pattern: regexp.MustCompile("^"),
-	}
+	root = &UrlNode{}
 	currentNode = root
+	logger = log.GetLogger("/monica/core/router")
 }

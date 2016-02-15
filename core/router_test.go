@@ -10,20 +10,21 @@ func TestRouter(t *testing.T) {
 	}
 	Group("^/product",
 		func() {
-			Handle(`^/update/(?P<id>\d+)`, fn)
-			Handle(`^/create/`, fn)
+			Handle(`^/update/(?P<id>\d+)$`, fn)
+			Handle(`^/create$`, fn)
 			Group("^/partial", func(){
-				Handle("^/test/", fn)
+				Handle("^/test$", fn)
 			})
 		},
 	)
+	DebugRoute()
 	processor, err := GetProcessor("/product/update/1")
 	if err != nil {
 		t.Error(err)
 	}
 	t.Logf("%+v", processor)
 
-	processor, err = GetProcessor("/product/partial/test/")
+	processor, err = GetProcessor("/product/partial/test")
 
 	if err != nil {
 		t.Error(err)
