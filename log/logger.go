@@ -106,7 +106,7 @@ type MonicaLogger struct {
 
 func (logger *MonicaLogger) logEmit(record *Record) {
 	// if logger level is not satisfied just ignore the record
-	if record.Level < logger.level {
+	if record.Level > logger.level {
 		return
 	}
 	for _, handler := range logger.handlers {

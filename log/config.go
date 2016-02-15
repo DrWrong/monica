@@ -20,21 +20,25 @@ type HandlerOption struct {
 
 func (option *HandlerOption) InitHandler() {
 	var handler Handler
+	var err error
 	switch option.Type {
 	case "FileHandler":
 		baseFileName := option.Args["baseFileName"]
 		baseFileName = path.Join(os.Getenv("MONICA_RUNDIR"), baseFileName)
 		formatter := option.Args["formatter"]
-		handler, _ = NewFileHandler(baseFileName, formatter)
+		handler, err = NewFileHandler(baseFileName, formatter)
 	case "TimeRotatingFileHandler":
 		baseFileName := option.Args["baseFileName"]
 		baseFileName = path.Join(os.Getenv("MONICA_RUNDIR"), baseFileName)
 		formatter := option.Args["formatter"]
 		when := option.Args["when"]
 		backupCount, _ := strconv.Atoi(option.Args["backupCount"])
-		handler, _ = NewTimeRotatingFileHandler(baseFileName, formatter, when, backupCount)
+		handler, err = NewTimeRotatingFileHandler(baseFileName, formatter, when, backupCount)
 	default:
 		panic("not support handler type")
+	}
+	if err != nil{
+		panic(err)
 	}
 	handlersMap[option.Name] = NewThreadSafeHandler(handler)
 }
