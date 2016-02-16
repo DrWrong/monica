@@ -5,15 +5,14 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"syscall"
 	"time"
 
+	"github.com/DrWrong/monica/thrift"
 	"github.com/DrWrong/monica/config"
 	"github.com/DrWrong/monica/core"
 	"github.com/DrWrong/monica/log"
-	"github.com/astaxie/beego/orm"
-	_ "github.com/go-sql-driver/mysql"
-	"thrift"
 )
 
 var (
@@ -22,6 +21,7 @@ var (
 )
 
 func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
 	go func() {
 		for {
@@ -55,9 +55,6 @@ func initGloabl(customizedConfig func()) {
 	os.Setenv("MONICA_RUNDIR", config.GlobalConfiger.String("default::runDir"))
 	// now config log module
 	log.InitLoggerFromConfigure(config.GlobalConfiger)
-
-	// now config db module we use beego as default db
-	initDb()
 
 	if customizedConfig != nil {
 		customizedConfig()
@@ -108,27 +105,4 @@ func initGlobalConfiger() {
 		return
 	}
 	panic("no config file found!!!")
-}
-
-func initDb() {
-	orm.RegisterDriver("mysql", orm.DRMySQL)
-	var initOk bool
-	configerMap, _ := config.GlobalConfiger.Map("mysql")
-	for key, value := range configerMap {
-		if key == "default" {
-			initOk = true
-		}
-		if err := orm.RegisterDataBase(key, "mysql", value.(string)); err != nil {
-			panic(err)
-		}
-	}
-
-	if !initOk {
-		panic("a database instance called default must be inited")
-	}
-
-	if config.GlobalConfiger.String("runmode") == "dev" {
-		orm.Debug = true
-	}
-
 }
