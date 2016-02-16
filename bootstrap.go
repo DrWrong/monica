@@ -22,6 +22,12 @@ var (
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	// add default configure
+	initGlobalConfiger()
+	os.Setenv("MONICA_RUNDIR", config.GlobalConfiger.String("default::runDir"))
+	// now config log module
+	log.InitLoggerFromConfigure(config.GlobalConfiger)
+
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
 	go func() {
 		for {
@@ -31,7 +37,7 @@ func init() {
 			sig := <-c
 			bootStrapLogger.Infof("Signal %d received", sig)
 			if thriftServer != nil {
-				bootStrapLogger.Info("thrift server is goint to stop")
+				bootStrapLogger.Info("thrift server is going to stop")
 				thriftServer.Stop()
 				bootStrapLogger.Info("thrift server has gone away")
 			}
@@ -50,12 +56,6 @@ func BootStrap(customizedConfig func()) {
 }
 
 func initGloabl(customizedConfig func()) {
-	// add default configure
-	initGlobalConfiger()
-	os.Setenv("MONICA_RUNDIR", config.GlobalConfiger.String("default::runDir"))
-	// now config log module
-	log.InitLoggerFromConfigure(config.GlobalConfiger)
-
 	if customizedConfig != nil {
 		customizedConfig()
 	}
