@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	GlobalThriftPool map[string]Pool
+	GlobalThriftPool map[string]*Pool
 )
 
 // 定义一个thrift client 的接口
@@ -151,7 +151,7 @@ type Pool struct {
 
 func NewThriftPool(clientFactory interface{}, host []string,
 	framed bool, maxIdle int, maxRetry uint,
-	withComonHeader bool) *Pool {
+	withCommonHeader bool) *Pool {
 	return &Pool{
 		ClientFactory:    clientFactory,
 		Framed:           framed,
@@ -331,7 +331,6 @@ func (p *Pool) CallWithRetry(name string, args ...interface{}) (res interface{},
 }
 
 func RegisterPool(poolname string, clientFactory interface{}) {
-	poolConfig, _ := config.GlobalConfiger.Map(fmt.Sprintf("thriftpool::%s", poolname))
 	field := fmt.Sprintf("thriftpool::%s", poolname)
 
 	hosts := config.GlobalConfiger.Strings(
@@ -346,16 +345,21 @@ func RegisterPool(poolname string, clientFactory interface{}) {
 	maxRetry, _ := config.GlobalConfiger.Int(
 		fmt.Sprintf("%s::max_retry", field))
 
-	withCommonHeader := config.GlobalConfiger.Bool(
+	withCommonHeader, _ := config.GlobalConfiger.Bool(
 		fmt.Sprintf("%s::with_common_header", field))
 
 	GlobalThriftPool[poolname] = NewThriftPool(
 		clientFactory,
-		hosts, framed, maxIdle, uint(maxRetry), withComonHeader)
+		hosts,
+		framed,
+		maxIdle,
+		uint(maxRetry),
+		withCommonHeader)
 
 }
 
 func init() {
 	// 种子只初始化一次，用以保证生成的是随机化序列
 	rand.Seed(time.Now().Unix())
+	GlobalThriftPool = make(map[string]*Pool, 0)
 }
