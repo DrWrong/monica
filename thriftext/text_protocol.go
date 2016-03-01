@@ -7,7 +7,7 @@
 package thriftext
 
 import (
-	"thrift"
+	"github.com/DrWrong/monica/thrift"
 	"strconv"
 )
 

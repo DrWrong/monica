@@ -10,8 +10,14 @@ import (
 	"math/rand"
 	"reflect"
 	"sync"
-	"thrift"
 	"time"
+
+	"github.com/DrWrong/monica/config"
+	"github.com/DrWrong/monica/thrift"
+)
+
+var (
+	GlobalThriftPool map[string]Pool
 )
 
 // 定义一个thrift client 的接口
@@ -30,9 +36,9 @@ func closeTransport(client ThriftClient) {
 
 // //定义了一个封装的thrift cliet 该类有一个封装的Close方法用于将client返回到类中
 type WrappedClient struct {
-	p      *Pool
-	client ThriftClient
-	err    error
+	p         *Pool
+	client    ThriftClient
+	err       error
 	borrowNum int //被调用的次数
 }
 
@@ -144,14 +150,15 @@ type Pool struct {
 }
 
 func NewThriftPool(clientFactory interface{}, host []string,
-	framed bool, maxIdle int, maxRetry uint) *Pool {
+	framed bool, maxIdle int, maxRetry uint,
+	withComonHeader bool) *Pool {
 	return &Pool{
 		ClientFactory:    clientFactory,
 		Framed:           framed,
 		Host:             host,
 		MaxIdle:          maxIdle,
 		MaxRetry:         maxRetry,
-		WithCommonHeader: true, //默认下支持多个头部
+		WithCommonHeader: withCommonHeader, //默认下支持多个头部
 	}
 }
 
@@ -323,6 +330,30 @@ func (p *Pool) CallWithRetry(name string, args ...interface{}) (res interface{},
 	return
 }
 
+func RegisterPool(poolname string, clientFactory interface{}) {
+	poolConfig, _ := config.GlobalConfiger.Map(fmt.Sprintf("thriftpool::%s", poolname))
+	field := fmt.Sprintf("thriftpool::%s", poolname)
+
+	hosts := config.GlobalConfiger.Strings(
+		fmt.Sprintf("%s::hosts", field))
+
+	framed, _ := config.GlobalConfiger.Bool(
+		fmt.Sprintf("%s::framed", field))
+
+	maxIdle, _ := config.GlobalConfiger.Int(
+		fmt.Sprintf("%s::max_idle", field))
+
+	maxRetry, _ := config.GlobalConfiger.Int(
+		fmt.Sprintf("%s::max_retry", field))
+
+	withCommonHeader := config.GlobalConfiger.Bool(
+		fmt.Sprintf("%s::with_common_header", field))
+
+	GlobalThriftPool[poolname] = NewThriftPool(
+		clientFactory,
+		hosts, framed, maxIdle, uint(maxRetry), withComonHeader)
+
+}
 
 func init() {
 	// 种子只初始化一次，用以保证生成的是随机化序列
