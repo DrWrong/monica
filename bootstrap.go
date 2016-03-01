@@ -55,6 +55,8 @@ func BootStrap(customizedConfig func()) {
 	server.Run()
 }
 
+
+
 func initGloabl(customizedConfig func()) {
 	if customizedConfig != nil {
 		customizedConfig()

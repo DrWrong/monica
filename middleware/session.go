@@ -38,6 +38,17 @@ type Options struct {
 	IDLength       int
 }
 
+func NewSessioner(options *Options) core.Handler {
+	manager := NewManager(options)
+	return func(ctx *core.Context){
+		session, err := manager.Start(ctx)
+		if err != nil {
+			panic(err)
+		}
+		ctx.Map(session)
+	}
+}
+
 func (opt *Options) sessionId() string {
 	b := make([]byte, opt.IDLength/2)
 	if _, err := rand.Read(b); err != nil {
