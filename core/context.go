@@ -1,8 +1,12 @@
 package core
 
 import (
-	"github.com/DrWrong/monica/core/inject"
+	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/DrWrong/monica/core/inject"
 )
 
 type Handler interface{}
@@ -14,35 +18,45 @@ type Context struct {
 	handlers []Handler
 	index    int
 	*http.Request
-	Resp          http.ResponseWriter
-	CookieSupport bool
-	Kwargs        map[string]string
-	// Data is used for a json response which
-	Data map[string]interface{}
+	Resp   http.ResponseWriter
+	Kwargs map[string]string
 	// a bool value which control wheather will go on processing
 	stopProcess bool
+}
+
+func (c *Context) QueryInt(name string) (int, error) {
+	value := c.FormValue(name)
+	return strconv.Atoi(value)
+}
+
+func (c *Context) GetClientIp() string {
+	return strings.Split(c.RemoteAddr, ":")[0]
+
+}
+
+func (c *Context) RenderJson(data interface{}) {
+	c.Resp.Header().Set("Content-type", "application/json; charset=utf-8")
+	res, err := json.Marshal(data)
+	if err != nil {
+		panic(err)
+	}
+	c.Resp.Write(res)
+	c.stopProcess = true
 }
 
 // get Cookie
 // try get cookie from cookie itself
 // if cookie not support for example: app rest then use query
 func (c *Context) GetCookie(name string) string {
-	if c.CookieSupport {
-		sessionCookie, err := c.Cookie(name)
-		if err != nil {
-			return ""
-		}
-		return sessionCookie.Value
+	sessionCookie, err := c.Cookie(name)
+	if err != nil {
+		return ""
 	}
-	return c.FormValue(name)
+	return sessionCookie.Value
 }
 
 func (c *Context) SetCookie(cookie *http.Cookie) {
-	if c.CookieSupport {
-		http.SetCookie(c.Resp, cookie)
-	} else {
-		c.Data[cookie.Name] = cookie.Value
-	}
+	http.SetCookie(c.Resp, cookie)
 }
 
 // stop process
@@ -76,7 +90,6 @@ func NewContext(resp http.ResponseWriter, req *http.Request) *Context {
 		Injector:      inject.New(),
 		Request:       req,
 		Resp:          resp,
-		CookieSupport: true,
 	}
 	c.Map(c)
 	return c

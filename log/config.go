@@ -71,6 +71,7 @@ func InitLogger(handlerOptions []*HandlerOption, loggerOption []*LoggerOption) {
 	for _, option := range loggerOption {
 		option.InitLogger()
 	}
+	initialized = true
 }
 
 func InitLoggerFromConfigure(configure config.Configer) {

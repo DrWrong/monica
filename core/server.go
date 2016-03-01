@@ -29,6 +29,7 @@ func (server *MonicaWebServer) ServeHTTP(rw http.ResponseWriter, req *http.Reque
 func (server *MonicaWebServer) Run() {
 	switch server.ServerMode {
 	case "http":
+		fmt.Printf("run http server on %s\n", server.Addr)
 		err := http.ListenAndServe(server.Addr, server)
 		if err != nil {
 			panic(err)

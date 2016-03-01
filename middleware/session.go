@@ -23,7 +23,7 @@ func init() {
 
 type Sessioner interface {
 	Set(string, interface{}) error
-	Get(string) interface{}
+	Get(string) (interface{}, error)
 	Delete(string) error
 	ID() string
 }
@@ -225,11 +225,10 @@ func (session *RedisSessioner) Set(key string, value interface{}) error {
 }
 
 // TODO: interface convert
-func (session *RedisSessioner) Get(key string) interface{} {
+func (session *RedisSessioner) Get(key string) (interface{}, error) {
 	conn := session.redisPool.Get()
 	defer conn.Close()
-	res, _ := conn.Do("HGET", getRedisKey(session.sid), key)
-	return res
+	return conn.Do("HGET", getRedisKey(session.sid), key)
 }
 
 func (session *RedisSessioner) Delete(key string) error {

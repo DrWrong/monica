@@ -13,9 +13,16 @@ var (
 	loggerMap          map[string]*MonicaLogger
 	propagateLoggerMap map[string][]*MonicaLogger
 	rootLogger         *MonicaLogger
+	initialized        bool
 )
 
 func GetLogger(name string) *MonicaLogger {
+	if !initialized {
+		return &MonicaLogger{
+			loggerPath: name,
+			isCache:    true,
+		}
+	}
 	for {
 		logger, ok := loggerMap[name]
 		if ok {
@@ -101,6 +108,8 @@ type MonicaLogger struct {
 	handlers   []Handler
 	level      Level
 	loggerName string
+	loggerPath string
+	isCache    bool
 	Propagte   bool
 }
 
@@ -116,6 +125,12 @@ func (logger *MonicaLogger) logEmit(record *Record) {
 }
 
 func (logger *MonicaLogger) log(level Level, msg string) {
+	if logger.isCache {
+		if !initialized {
+			panic("cannot use logger before initialize")
+		}
+		logger = GetLogger(logger.loggerPath)
+	}
 	record := NewRecord(level, msg)
 	logger.logEmit(record)
 	if logger.Propagte {
