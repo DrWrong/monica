@@ -2,11 +2,16 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/DrWrong/monica/core/inject"
+	"github.com/DrWrong/monica/form"
+	"github.com/astaxie/beego/validation"
 )
 
 type Handler interface{}
@@ -18,10 +23,18 @@ type Context struct {
 	handlers []Handler
 	index    int
 	*http.Request
-	Resp   http.ResponseWriter
-	Kwargs map[string]string
+	Resp          http.ResponseWriter
+	Kwargs        map[string]string
+	parseFormOnce sync.Once
 	// a bool value which control wheather will go on processing
 	stopProcess bool
+}
+
+func (c *Context) parseForm() {
+	c.ParseForm()
+	for key, value := range c.Kwargs {
+		c.Form.Set(key, value)
+	}
 }
 
 func (c *Context) QueryInt(name string) (int, error) {
@@ -70,7 +83,25 @@ func (c *Context) Next() {
 	c.run()
 }
 
+func (c *Context) Bind(formStruct interface{}) (bool, error) {
+	form.Bind(c.Form, formStruct)
+	valid := validation.Validation{}
+	b, err := valid.Valid(formStruct)
+	if err != nil {
+		return false, err
+	}
+	if b {
+		return true, nil
+	}
+	res := ""
+	for _, err := range valid.Errors {
+		res += fmt.Sprintf("%s: %s;", err.Key, err.Message)
+	}
+	return false, errors.New(res)
+}
+
 func (c *Context) run() {
+	c.parseFormOnce.Do(c.parseForm)
 	for c.index < len(c.handlers) {
 		if c.stopProcess {
 			break
@@ -87,9 +118,9 @@ func (c *Context) run() {
 
 func NewContext(resp http.ResponseWriter, req *http.Request) *Context {
 	c := &Context{
-		Injector:      inject.New(),
-		Request:       req,
-		Resp:          resp,
+		Injector: inject.New(),
+		Request:  req,
+		Resp:     resp,
 	}
 	c.Map(c)
 	return c

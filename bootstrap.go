@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DrWrong/monica/thrift"
 	"github.com/DrWrong/monica/config"
 	"github.com/DrWrong/monica/core"
 	"github.com/DrWrong/monica/log"
+	"github.com/DrWrong/monica/thrift"
 )
 
 var (
@@ -54,8 +54,6 @@ func BootStrap(customizedConfig func()) {
 	server := core.NewServer()
 	server.Run()
 }
-
-
 
 func initGloabl(customizedConfig func()) {
 	if customizedConfig != nil {
