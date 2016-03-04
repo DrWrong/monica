@@ -75,7 +75,7 @@ func BootStrapThriftServer(processor thrift.TProcessor, customizedConfig func())
 		os.Exit(1)
 	}
 	thriftServer = thrift.NewTSimpleServer4(processor, serverTransport, transportFactory, protocolFactory)
-	bootStrapLogger.Infof("thrift server in %s", networkAddr)
+	fmt.Printf("thrift server in %s\n", networkAddr)
 	if err := thriftServer.Serve(); err != nil {
 		bootStrapLogger.Errorf("server start error: %s", err)
 	}
