@@ -24,10 +24,13 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	// add default configure
 	initGlobalConfiger()
-	os.Setenv("MONICA_RUNDIR", config.GlobalConfiger.String("default::runDir"))
+	runDir := config.GlobalConfiger.String("default::runDir")
+	if runDir != "" {
+		os.Setenv("MONICA_RUNDIR", runDir)
+	}
 	// now config log module
 	log.InitLoggerFromConfigure(config.GlobalConfiger)
-
+	println("init logger ok")
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
 	go func() {
 		for {
@@ -56,9 +59,11 @@ func BootStrap(customizedConfig func()) {
 }
 
 func initGloabl(customizedConfig func()) {
+	bootStrapLogger.Debug("start init global config")
 	if customizedConfig != nil {
 		customizedConfig()
 	}
+	bootStrapLogger.Debug("init global config ok")
 
 }
 

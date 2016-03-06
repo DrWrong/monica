@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/DrWrong/monica/core"
@@ -21,11 +20,20 @@ func init() {
 	sessionLogger = log.GetLogger("/monica/middleware/session")
 }
 
+// 定义session接口
 type Sessioner interface {
 	Set(string, interface{}) error
 	Get(string) (interface{}, error)
 	Delete(string) error
 	ID() string
+}
+
+type Provider interface {
+	Init(map[string]interface{}) error
+	StartSession(opt *Options) (Sessioner, error)
+	Exist(sid string) (bool, error)
+	Destroy(sid string) error
+	GetSessioner(sid string) (Sessioner, error)
 }
 
 type Options struct {
@@ -40,7 +48,7 @@ type Options struct {
 
 func NewSessioner(options *Options) core.Handler {
 	manager := NewManager(options)
-	return func(ctx *core.Context){
+	return func(ctx *core.Context) {
 		session, err := manager.Start(ctx)
 		if err != nil {
 			panic(err)
@@ -49,6 +57,7 @@ func NewSessioner(options *Options) core.Handler {
 	}
 }
 
+// 获取session id
 func (opt *Options) sessionId() string {
 	b := make([]byte, opt.IDLength/2)
 	if _, err := rand.Read(b); err != nil {
@@ -57,14 +66,6 @@ func (opt *Options) sessionId() string {
 
 	return hex.EncodeToString(b)
 
-}
-
-type Provider interface {
-	Init(map[string]interface{}) error
-	StartSession(opt *Options) Sessioner
-	Exist(sid string) bool
-	Destroy(sid string) error
-	GetSessioner(sid string) Sessioner
 }
 
 type Manager struct {
@@ -94,10 +95,17 @@ func (manager *Manager) getProvider() Provider {
 
 func (manager *Manager) Start(ctx *core.Context) (Sessioner, error) {
 	sid := ctx.GetCookie(manager.opt.CookieName)
-	if len(sid) > 0 && manager.provider.Exist(sid) {
-		return manager.provider.GetSessioner(sid), nil
+	if len(sid) > 0 {
+		if ok, err := manager.provider.Exist(sid); err != nil {
+			return nil, err
+		} else if ok {
+			return manager.provider.GetSessioner(sid)
+		}
 	}
-	sess := manager.provider.StartSession(manager.opt)
+	sess, err := manager.provider.StartSession(manager.opt)
+	if err != nil {
+		return nil, err
+	}
 	cookie := &http.Cookie{
 		Name:   manager.opt.CookieName,
 		Value:  sess.ID(),
@@ -114,13 +122,13 @@ func (manager *Manager) Start(ctx *core.Context) (Sessioner, error) {
 
 type RedisProvider struct {
 	redisPool *redis.Pool
-	sync.Mutex
 }
 
 func newRedisProvider() Provider {
 	return &RedisProvider{}
 }
 
+// 初始化redis pool
 func (provider *RedisProvider) Init(config map[string]interface{}) error {
 	provider.redisPool = &redis.Pool{
 		MaxIdle:     5,
@@ -154,43 +162,51 @@ func getRedisKey(sid string) string {
 	return fmt.Sprintf("MONICA_SESSION_%s", sid)
 }
 
-func (provider *RedisProvider) StartSession(option *Options) Sessioner {
+func (provider *RedisProvider) StartSession(option *Options) (Sessioner, error) {
 	conn := provider.redisPool.Get()
 	defer conn.Close()
 	for {
 		sid := option.sessionId()
-		sess, ok := provider.startSession(sid, conn, option)
+		sess, ok, err := provider.startSession(sid, conn, option)
+		if err != nil {
+			return nil, err
+		}
+
 		if ok {
-			return sess
+			return sess, nil
 		}
 	}
 }
 
 // check - lock - check
-func (provider *RedisProvider) startSession(sid string, conn redis.Conn, option *Options) (Sessioner, bool) {
-	if exist, _ := redis.Bool(conn.Do("EXISTS", getRedisKey(sid))); exist {
-		return nil, false
+func (provider *RedisProvider) startSession(sid string, conn redis.Conn, option *Options) (Sessioner, bool, error) {
+	// 检查随机生成的session是否被占用了
+	if exist, err := redis.Bool(conn.Do("EXISTS", getRedisKey(sid))); exist || err != nil {
+		return nil, false, err
 	}
-	provider.Lock()
-	defer provider.Unlock()
-	if exist, _ := redis.Bool(conn.Do("EXISTS", getRedisKey(sid))); exist {
-		return nil, false
-	}
+	// 观察sid
+	conn.Send("WATCH", getRedisKey(sid))
 	conn.Send("MULTI")
 	conn.Send("HSET", getRedisKey(sid), "createtime", time.Now().Unix())
 	if option.Cookielifttime > 0 {
 		conn.Send("EXPIRE", getRedisKey(sid), option.Cookielifttime)
 	}
-	conn.Send("EXEC")
-	conn.Flush()
-	return provider.GetSessioner(sid), true
+	replay, err := conn.Do("EXEC")
+	if err != nil {
+		return nil, false, err
+	}
+	if replay == nil {
+		return nil, false, nil
+	}
+	sessioner, err := provider.GetSessioner(sid)
+	return sessioner, true, err
 }
 
-func (provider *RedisProvider) GetSessioner(sid string) Sessioner {
+func (provider *RedisProvider) GetSessioner(sid string) (Sessioner, error) {
 	return &RedisSessioner{
 		redisPool: provider.redisPool,
 		sid:       sid,
-	}
+	}, nil
 }
 
 func (provider *RedisProvider) Destroy(sid string) error {
@@ -200,11 +216,10 @@ func (provider *RedisProvider) Destroy(sid string) error {
 	return conn.Flush()
 }
 
-func (provider *RedisProvider) Exist(sid string) bool {
+func (provider *RedisProvider) Exist(sid string) (bool, error) {
 	conn := provider.redisPool.Get()
 	defer conn.Close()
-	ok, _ := redis.Bool(conn.Do("EXISTS", getRedisKey(sid)))
-	return ok
+	return redis.Bool(conn.Do("EXISTS", getRedisKey(sid)))
 }
 
 type RedisSessioner struct {
