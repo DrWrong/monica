@@ -46,19 +46,19 @@ func Bind(kwargs url.Values, form interface{}) {
 		case reflect.String:
 			fieldValue.SetString(value)
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			if intValue, err := strconv.ParseInt(value, 10, 64); err != nil {
+			if intValue, err := strconv.ParseInt(value, 10, 64); err == nil {
 				fieldValue.SetInt(intValue)
 			}
 		case reflect.Uint, reflect.Uint8, reflect.Uint32, reflect.Uint64:
-			if uintValue, err := strconv.ParseUint(value, 10, 64); err != nil {
+			if uintValue, err := strconv.ParseUint(value, 10, 64); err == nil {
 				fieldValue.SetUint(uintValue)
 			}
 		case reflect.Bool:
-			if boolValue, err := strconv.ParseBool(value); err != nil {
+			if boolValue, err := strconv.ParseBool(value); err == nil {
 				fieldValue.SetBool(boolValue)
 			}
 		case reflect.Float32, reflect.Float64:
-			if floatValue, err := strconv.ParseFloat(value, 64); err != nil {
+			if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
 				fieldValue.SetFloat(floatValue)
 			}
 
