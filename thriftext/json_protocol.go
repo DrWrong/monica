@@ -21,11 +21,9 @@ package thriftext
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"strconv"
 
@@ -74,14 +72,12 @@ type JSONProtocol struct {
 	dumpContext       []int
 
 	writer *bufio.Writer
-	reader *bufio.Reader
 }
 
 // Constructor
 func NewJSONProtocol(t TTransport) *JSONProtocol {
 	v := &JSONProtocol{trans: t,
 		writer: bufio.NewWriter(t),
-		reader: bufio.NewReader(t),
 	}
 	v.parseContextStack = append(v.parseContextStack, int(_CONTEXT_IN_TOPLEVEL))
 	v.dumpContext = append(v.dumpContext, int(_CONTEXT_IN_TOPLEVEL))
@@ -98,7 +94,6 @@ func (p *JSONProtocolFactory) GetProtocol(trans TTransport) TProtocol {
 func NewJSONProtocolFactory() *JSONProtocolFactory {
 	return &JSONProtocolFactory{}
 }
-
 
 func jsonQuote(s string) string {
 	b, _ := json.Marshal(s)
@@ -249,243 +244,83 @@ func (p *JSONProtocol) WriteBinary(v []byte) error {
 // Reading methods.
 
 func (p *JSONProtocol) ReadMessageBegin() (name string, typeId TMessageType, seqId int32, err error) {
-	if isNull, err := p.ParseListBegin(); isNull || err != nil {
-		return name, typeId, seqId, err
-	}
-	if name, err = p.ReadString(); err != nil {
-		return name, typeId, seqId, err
-	}
-	bTypeId, err := p.ReadByte()
-	typeId = TMessageType(bTypeId)
-	if err != nil {
-		return name, typeId, seqId, err
-	}
-	if seqId, err = p.ReadI32(); err != nil {
-		return name, typeId, seqId, err
-	}
-	return name, typeId, seqId, nil
+	return
 }
 
 func (p *JSONProtocol) ReadMessageEnd() error {
-	return p.ParseListEnd()
+	return nil
 }
 
 func (p *JSONProtocol) ReadStructBegin() (name string, err error) {
-	_, err = p.ParseObjectStart()
-	return "", err
+	return "", nil
 }
 
 func (p *JSONProtocol) ReadStructEnd() error {
-	return p.ParseObjectEnd()
+	return nil
 }
 
 func (p *JSONProtocol) ReadFieldBegin() (string, TType, int16, error) {
-	if err := p.ParsePreValue(); err != nil {
-		return "", STOP, 0, err
-	}
-	b, _ := p.reader.Peek(1)
-	if len(b) > 0 {
-		switch b[0] {
-		case JSON_RBRACE[0]:
-			return "", STOP, 0, nil
-		case JSON_QUOTE:
-			p.reader.ReadByte()
-			name, err := p.ParseStringBody()
-			// simplejson is not meant to be read back into thrift
-			// - see http://wiki.apache.org/thrift/ThriftUsageJava
-			// - use JSON instead
-			if err != nil {
-				return name, STOP, 0, err
-			}
-			return name, STOP, -1, p.ParsePostValue()
-			/*
-			   if err = p.ParsePostValue(); err != nil {
-			     return name, STOP, 0, err
-			   }
-			   if isNull, err := p.ParseListBegin(); isNull || err != nil {
-			     return name, STOP, 0, err
-			   }
-			   bType, err := p.ReadByte()
-			   thetype := TType(bType)
-			   if err != nil {
-			     return name, thetype, 0, err
-			   }
-			   id, err := p.ReadI16()
-			   return name, thetype, id, err
-			*/
-		}
-		e := fmt.Errorf("Expected \"}\" or '\"', but found: '%s'", string(b))
-		return "", STOP, 0, NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	return "", STOP, 0, NewTProtocolException(io.EOF)
+	return "", STOP, 0, nil
 }
 
 func (p *JSONProtocol) ReadFieldEnd() error {
 	return nil
-	//return p.ParseListEnd()
 }
 
 func (p *JSONProtocol) ReadMapBegin() (keyType TType, valueType TType, size int, e error) {
-	if isNull, e := p.ParseListBegin(); isNull || e != nil {
-		return VOID, VOID, 0, e
-	}
-
-	// read keyType
-	bKeyType, e := p.ReadByte()
-	keyType = TType(bKeyType)
-	if e != nil {
-		return keyType, valueType, size, e
-	}
-
-	// read valueType
-	bValueType, e := p.ReadByte()
-	valueType = TType(bValueType)
-	if e != nil {
-		return keyType, valueType, size, e
-	}
-
-	// read size
-	iSize, err := p.ReadI64()
-	size = int(iSize)
-	return keyType, valueType, size, err
+	return VOID, VOID, 0, nil
 }
 
 func (p *JSONProtocol) ReadMapEnd() error {
-	return p.ParseListEnd()
+	return nil
 }
 
 func (p *JSONProtocol) ReadListBegin() (elemType TType, size int, e error) {
-	return p.ParseElemListBegin()
+	return VOID, 0, nil
 }
 
 func (p *JSONProtocol) ReadListEnd() error {
-	return p.ParseListEnd()
+	return nil
 }
 
 func (p *JSONProtocol) ReadSetBegin() (elemType TType, size int, e error) {
-	return p.ParseElemListBegin()
+	return VOID, 0, nil
 }
 
 func (p *JSONProtocol) ReadSetEnd() error {
-	return p.ParseListEnd()
+	return nil
 }
 
 func (p *JSONProtocol) ReadBool() (bool, error) {
-	var value bool
-	if err := p.ParsePreValue(); err != nil {
-		return value, err
-	}
-	b, _ := p.reader.Peek(len(JSON_TRUE))
-	if len(b) > 0 {
-		switch b[0] {
-		case JSON_TRUE[0]:
-			if string(b) == string(JSON_TRUE) {
-				p.reader.Read(b[0:len(JSON_TRUE)])
-				value = true
-			} else {
-				e := fmt.Errorf("Expected \"true\" but found: %s", string(b))
-				return value, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			break
-		case JSON_FALSE[0]:
-			if string(b) == string(JSON_FALSE[:len(b)]) {
-				p.reader.Read(b[0:len(JSON_FALSE)])
-				value = false
-			} else {
-				e := fmt.Errorf("Expected \"false\" but found: %s", string(b))
-				return value, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			break
-		case JSON_NULL[0]:
-			if string(b) == string(JSON_NULL) {
-				p.reader.Read(b[0:len(JSON_NULL)])
-				value = false
-			} else {
-				e := fmt.Errorf("Expected \"null\" but found: %s", string(b))
-				return value, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-		default:
-			e := fmt.Errorf("Expected \"true\", \"false\", or \"null\" but found: %s", string(b))
-			return value, NewTProtocolExceptionWithType(INVALID_DATA, e)
-		}
-	}
-	return value, p.ParsePostValue()
+	return false, nil
 }
 
 func (p *JSONProtocol) ReadByte() (byte, error) {
-	v, err := p.ReadI64()
-	return byte(v), err
+	return 0, nil
 }
 
 func (p *JSONProtocol) ReadI16() (int16, error) {
-	v, err := p.ReadI64()
-	return int16(v), err
+	return 0, nil
 }
 
 func (p *JSONProtocol) ReadI32() (int32, error) {
-	v, err := p.ReadI64()
-	return int32(v), err
+	return 0, nil
 }
 
 func (p *JSONProtocol) ReadI64() (int64, error) {
-	v, _, err := p.ParseI64()
-	return v, err
+	return 0, nil
 }
 
 func (p *JSONProtocol) ReadDouble() (float64, error) {
-	v, _, err := p.ParseF64()
-	return v, err
+	return 0, nil
 }
 
 func (p *JSONProtocol) ReadString() (string, error) {
-	var v string
-	if err := p.ParsePreValue(); err != nil {
-		return v, err
-	}
-	var b []byte
-	b, _ = p.reader.Peek(len(JSON_NULL))
-	if len(b) > 0 && b[0] == JSON_QUOTE {
-		p.reader.ReadByte()
-		value, err := p.ParseStringBody()
-		v = value
-		if err != nil {
-			return v, err
-		}
-	} else if len(b) >= len(JSON_NULL) && string(b[0:len(JSON_NULL)]) == string(JSON_NULL) {
-		_, err := p.reader.Read(b[0:len(JSON_NULL)])
-		if err != nil {
-			return v, NewTProtocolException(err)
-		}
-	} else {
-		e := fmt.Errorf("Expected a JSON string, found %s", string(b))
-		return v, NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	return v, p.ParsePostValue()
+	return "", nil
 }
 
-func (p *JSONProtocol) ReadBinary() ([]byte, error) {
-	var v []byte
-	if err := p.ParsePreValue(); err != nil {
-		return nil, err
-	}
-	b, _ := p.reader.Peek(len(JSON_NULL))
-	if len(b) > 0 && b[0] == JSON_QUOTE {
-		p.reader.ReadByte()
-		value, err := p.ParseBase64EncodedBody()
-		v = value
-		if err != nil {
-			return v, err
-		}
-	} else if len(b) >= len(JSON_NULL) && string(b[0:len(JSON_NULL)]) == string(JSON_NULL) {
-		_, err := p.reader.Read(b[0:len(JSON_NULL)])
-		if err != nil {
-			return v, NewTProtocolException(err)
-		}
-	} else {
-		e := fmt.Errorf("Expected a JSON string, found %s", string(b))
-		return v, NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	return v, p.ParsePostValue()
+func (p *JSONProtocol) ReadBinary() (v []byte, err error) {
+	return
 }
 
 func (p *JSONProtocol) Flush() (err error) {
@@ -676,557 +511,4 @@ func (p *JSONProtocol) OutputElemListBegin(elemType TType, size int) error {
 		return e
 	}
 	return nil
-}
-
-func (p *JSONProtocol) ParsePreValue() error {
-	if e := p.readNonSignificantWhitespace(); e != nil {
-		return NewTProtocolException(e)
-	}
-	cxt := _ParseContext(p.parseContextStack[len(p.parseContextStack)-1])
-	b, _ := p.reader.Peek(1)
-	switch cxt {
-	case _CONTEXT_IN_LIST:
-		if len(b) > 0 {
-			switch b[0] {
-			case JSON_RBRACKET[0]:
-				return nil
-			case JSON_COMMA[0]:
-				p.reader.ReadByte()
-				if e := p.readNonSignificantWhitespace(); e != nil {
-					return NewTProtocolException(e)
-				}
-				return nil
-			default:
-				e := fmt.Errorf("Expected \"]\" or \",\" in list context, but found \"%s\"", string(b))
-				return NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-		}
-		break
-	case _CONTEXT_IN_OBJECT_NEXT_KEY:
-		if len(b) > 0 {
-			switch b[0] {
-			case JSON_RBRACE[0]:
-				return nil
-			case JSON_COMMA[0]:
-				p.reader.ReadByte()
-				if e := p.readNonSignificantWhitespace(); e != nil {
-					return NewTProtocolException(e)
-				}
-				return nil
-			default:
-				e := fmt.Errorf("Expected \"}\" or \",\" in object context, but found \"%s\"", string(b))
-				return NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-		}
-		break
-	case _CONTEXT_IN_OBJECT_NEXT_VALUE:
-		if len(b) > 0 {
-			switch b[0] {
-			case JSON_COLON[0]:
-				p.reader.ReadByte()
-				if e := p.readNonSignificantWhitespace(); e != nil {
-					return NewTProtocolException(e)
-				}
-				return nil
-			default:
-				e := fmt.Errorf("Expected \":\" in object context, but found \"%s\"", string(b))
-				return NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-		}
-		break
-	}
-	return nil
-}
-
-func (p *JSONProtocol) ParsePostValue() error {
-	if e := p.readNonSignificantWhitespace(); e != nil {
-		return NewTProtocolException(e)
-	}
-	cxt := _ParseContext(p.parseContextStack[len(p.parseContextStack)-1])
-	switch cxt {
-	case _CONTEXT_IN_LIST_FIRST:
-		p.parseContextStack = p.parseContextStack[:len(p.parseContextStack)-1]
-		p.parseContextStack = append(p.parseContextStack, int(_CONTEXT_IN_LIST))
-		break
-	case _CONTEXT_IN_OBJECT_FIRST, _CONTEXT_IN_OBJECT_NEXT_KEY:
-		p.parseContextStack = p.parseContextStack[:len(p.parseContextStack)-1]
-		p.parseContextStack = append(p.parseContextStack, int(_CONTEXT_IN_OBJECT_NEXT_VALUE))
-		break
-	case _CONTEXT_IN_OBJECT_NEXT_VALUE:
-		p.parseContextStack = p.parseContextStack[:len(p.parseContextStack)-1]
-		p.parseContextStack = append(p.parseContextStack, int(_CONTEXT_IN_OBJECT_NEXT_KEY))
-		break
-	}
-	return nil
-}
-
-func (p *JSONProtocol) readNonSignificantWhitespace() error {
-	for {
-		b, _ := p.reader.Peek(1)
-		if len(b) < 1 {
-			return nil
-		}
-		switch b[0] {
-		case ' ', '\r', '\n', '\t':
-			p.reader.ReadByte()
-			continue
-		default:
-			break
-		}
-		break
-	}
-	return nil
-}
-
-func (p *JSONProtocol) ParseStringBody() (string, error) {
-	line, err := p.reader.ReadString(JSON_QUOTE)
-	if err != nil {
-		return "", NewTProtocolException(err)
-	}
-	l := len(line)
-	// count number of escapes to see if we need to keep going
-	i := 1
-	for ; i < l; i++ {
-		if line[l-i-1] != '\\' {
-			break
-		}
-	}
-	if i&0x01 == 1 {
-		v, ok := jsonUnquote(string(JSON_QUOTE) + line)
-		if !ok {
-			return "", NewTProtocolException(err)
-		}
-		return v, nil
-	}
-	s, err := p.ParseQuotedStringBody()
-	if err != nil {
-		return "", NewTProtocolException(err)
-	}
-	str := string(JSON_QUOTE) + line + s
-	v, ok := jsonUnquote(str)
-	if !ok {
-		e := fmt.Errorf("Unable to parse as JSON string %s", str)
-		return "", NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	return v, nil
-}
-
-func (p *JSONProtocol) ParseQuotedStringBody() (string, error) {
-	line, err := p.reader.ReadString(JSON_QUOTE)
-	if err != nil {
-		return "", NewTProtocolException(err)
-	}
-	l := len(line)
-	// count number of escapes to see if we need to keep going
-	i := 1
-	for ; i < l; i++ {
-		if line[l-i-1] != '\\' {
-			break
-		}
-	}
-	if i&0x01 == 1 {
-		return line, nil
-	}
-	s, err := p.ParseQuotedStringBody()
-	if err != nil {
-		return "", NewTProtocolException(err)
-	}
-	v := line + s
-	return v, nil
-}
-
-func (p *JSONProtocol) ParseBase64EncodedBody() ([]byte, error) {
-	line, err := p.reader.ReadBytes(JSON_QUOTE)
-	if err != nil {
-		return line, NewTProtocolException(err)
-	}
-	line2 := line[0 : len(line)-1]
-	l := len(line2)
-	output := make([]byte, base64.StdEncoding.DecodedLen(l))
-	n, err := base64.StdEncoding.Decode(output, line2)
-	return output[0:n], NewTProtocolException(err)
-}
-
-func (p *JSONProtocol) ParseI64() (int64, bool, error) {
-	if err := p.ParsePreValue(); err != nil {
-		return 0, false, err
-	}
-	var value int64
-	var isnull bool
-	b, _ := p.reader.Peek(len(JSON_NULL))
-	if len(b) >= len(JSON_NULL) && string(b) == string(JSON_NULL) {
-		p.reader.Read(b[0:len(JSON_NULL)])
-		isnull = true
-	} else {
-		num, err := p.readNumeric()
-		isnull = (num == nil)
-		if !isnull {
-			value = num.Int64()
-		}
-		if err != nil {
-			return value, isnull, err
-		}
-	}
-	return value, isnull, p.ParsePostValue()
-}
-
-func (p *JSONProtocol) ParseF64() (float64, bool, error) {
-	if err := p.ParsePreValue(); err != nil {
-		return 0, false, err
-	}
-	var value float64
-	var isnull bool
-	b, _ := p.reader.Peek(len(JSON_NULL))
-	if len(b) >= len(JSON_NULL) && string(b) == string(JSON_NULL) {
-		p.reader.Read(b[0:len(JSON_NULL)])
-		isnull = true
-	} else {
-		num, err := p.readNumeric()
-		isnull = (num == nil)
-		if !isnull {
-			value = num.Float64()
-		}
-		if err != nil {
-			return value, isnull, err
-		}
-	}
-	return value, isnull, p.ParsePostValue()
-}
-
-func (p *JSONProtocol) ParseObjectStart() (bool, error) {
-	if err := p.ParsePreValue(); err != nil {
-		return false, err
-	}
-	var b []byte
-	b, _ = p.reader.Peek(len(JSON_NULL))
-	if len(b) > 0 && b[0] == JSON_LBRACE[0] {
-		p.reader.ReadByte()
-		p.parseContextStack = append(p.parseContextStack, int(_CONTEXT_IN_OBJECT_FIRST))
-		return false, nil
-	} else if len(b) >= len(JSON_NULL) && string(b[0:len(JSON_NULL)]) == string(JSON_NULL) {
-		return true, nil
-	}
-	e := fmt.Errorf("Expected '{' or null, but found '%s'", string(b))
-	return false, NewTProtocolExceptionWithType(INVALID_DATA, e)
-}
-
-func (p *JSONProtocol) ParseObjectEnd() error {
-	if isNull, err := p.readIfNull(); isNull || err != nil {
-		return err
-	}
-	cxt := _ParseContext(p.parseContextStack[len(p.parseContextStack)-1])
-	if cxt != _CONTEXT_IN_OBJECT_FIRST && cxt != _CONTEXT_IN_OBJECT_NEXT_KEY {
-		e := fmt.Errorf("Expected to be in the Object Context, but not in Object Context")
-		return NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	line, err := p.reader.ReadString(JSON_RBRACE[0])
-	if err != nil {
-		return NewTProtocolException(err)
-	}
-	for _, char := range line {
-		switch char {
-		default:
-			e := fmt.Errorf("Expecting end of object \"}\", but found: \"%s\"", line)
-			return NewTProtocolExceptionWithType(INVALID_DATA, e)
-		case ' ', '\n', '\r', '\t', '}':
-			break
-		}
-	}
-	p.parseContextStack = p.parseContextStack[:len(p.parseContextStack)-1]
-	return p.ParsePostValue()
-}
-
-func (p *JSONProtocol) ParseListBegin() (isNull bool, err error) {
-	if e := p.ParsePreValue(); e != nil {
-		return false, e
-	}
-	var b []byte
-	b, err = p.reader.Peek(len(JSON_NULL))
-	if err != nil {
-		return false, err
-	}
-	if len(b) >= 1 && b[0] == JSON_LBRACKET[0] {
-		p.parseContextStack = append(p.parseContextStack, int(_CONTEXT_IN_LIST_FIRST))
-		p.reader.ReadByte()
-		isNull = false
-	} else if len(b) >= len(JSON_NULL) && string(b) == string(JSON_NULL) {
-		isNull = true
-	} else {
-		err = fmt.Errorf("Expected \"null\" or \"[\", received %q", b)
-	}
-	return isNull, NewTProtocolExceptionWithType(INVALID_DATA, err)
-}
-
-func (p *JSONProtocol) ParseElemListBegin() (elemType TType, size int, e error) {
-	if isNull, e := p.ParseListBegin(); isNull || e != nil {
-		return VOID, 0, e
-	}
-	bElemType, err := p.ReadByte()
-	elemType = TType(bElemType)
-	if err != nil {
-		return elemType, size, err
-	}
-	nSize, err2 := p.ReadI64()
-	size = int(nSize)
-	return elemType, size, err2
-}
-
-func (p *JSONProtocol) ParseListEnd() error {
-	if isNull, err := p.readIfNull(); isNull || err != nil {
-		return err
-	}
-	if _ParseContext(p.parseContextStack[len(p.parseContextStack)-1]) != _CONTEXT_IN_LIST {
-		e := fmt.Errorf("Expected to be in the List Context, but not in List Context")
-		return NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	line, err := p.reader.ReadString(JSON_RBRACKET[0])
-	if err != nil {
-		return NewTProtocolException(err)
-	}
-	for _, char := range line {
-		switch char {
-		default:
-			e := fmt.Errorf("Expecting end of list \"]\", but found: \"", line, "\"")
-			return NewTProtocolExceptionWithType(INVALID_DATA, e)
-		case ' ', '\n', '\r', '\t', rune(JSON_RBRACKET[0]):
-			break
-		}
-	}
-	p.parseContextStack = p.parseContextStack[:len(p.parseContextStack)-1]
-	return p.ParsePostValue()
-}
-
-func (p *JSONProtocol) readSingleValue() (interface{}, TType, error) {
-	e := p.readNonSignificantWhitespace()
-	if e != nil {
-		return nil, VOID, NewTProtocolException(e)
-	}
-	b, e := p.reader.Peek(10)
-	if len(b) > 0 {
-		c := b[0]
-		switch c {
-		case JSON_NULL[0]:
-			buf := make([]byte, len(JSON_NULL))
-			_, e := p.reader.Read(buf)
-			if e != nil {
-				return nil, VOID, NewTProtocolException(e)
-			}
-			if string(JSON_NULL) != string(buf) {
-				e = mismatch(string(JSON_NULL), string(buf))
-				return nil, VOID, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			return nil, VOID, nil
-		case JSON_QUOTE:
-			p.reader.ReadByte()
-			v, e := p.ParseStringBody()
-			if e != nil {
-				return v, UTF8, NewTProtocolException(e)
-			}
-			if v == JSON_INFINITY {
-				return INFINITY, DOUBLE, nil
-			} else if v == JSON_NEGATIVE_INFINITY {
-				return NEGATIVE_INFINITY, DOUBLE, nil
-			} else if v == JSON_NAN {
-				return NAN, DOUBLE, nil
-			}
-			return v, UTF8, nil
-		case JSON_TRUE[0]:
-			buf := make([]byte, len(JSON_TRUE))
-			_, e := p.reader.Read(buf)
-			if e != nil {
-				return true, BOOL, NewTProtocolException(e)
-			}
-			if string(JSON_TRUE) != string(buf) {
-				e := mismatch(string(JSON_TRUE), string(buf))
-				return true, BOOL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			return true, BOOL, nil
-		case JSON_FALSE[0]:
-			buf := make([]byte, len(JSON_FALSE))
-			_, e := p.reader.Read(buf)
-			if e != nil {
-				return false, BOOL, NewTProtocolException(e)
-			}
-			if string(JSON_FALSE) != string(buf) {
-				e := mismatch(string(JSON_FALSE), string(buf))
-				return false, BOOL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			return false, BOOL, nil
-		case JSON_LBRACKET[0]:
-			_, e := p.reader.ReadByte()
-			return make([]interface{}, 0), LIST, NewTProtocolException(e)
-		case JSON_LBRACE[0]:
-			_, e := p.reader.ReadByte()
-			return make(map[string]interface{}), STRUCT, NewTProtocolException(e)
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'e', 'E', '.', '+', '-', JSON_INFINITY[0], JSON_NAN[0]:
-			// assume numeric
-			v, e := p.readNumeric()
-			return v, DOUBLE, e
-		default:
-			e := fmt.Errorf("Expected element in list but found '%s' while parsing JSON.", string(c))
-			return nil, VOID, NewTProtocolExceptionWithType(INVALID_DATA, e)
-		}
-	}
-	e = fmt.Errorf("Cannot read a single element while parsing JSON.")
-	return nil, VOID, NewTProtocolExceptionWithType(INVALID_DATA, e)
-
-}
-
-func (p *JSONProtocol) readIfNull() (bool, error) {
-	cont := true
-	for cont {
-		b, _ := p.reader.Peek(1)
-		if len(b) < 1 {
-			return false, nil
-		}
-		switch b[0] {
-		default:
-			return false, nil
-		case JSON_NULL[0]:
-			cont = false
-			break
-		case ' ', '\n', '\r', '\t':
-			p.reader.ReadByte()
-			break
-		}
-	}
-	b, _ := p.reader.Peek(len(JSON_NULL))
-	if string(b) == string(JSON_NULL) {
-		p.reader.Read(b[0:len(JSON_NULL)])
-		return true, nil
-	}
-	return false, nil
-}
-
-func (p *JSONProtocol) readQuoteIfNext() {
-	b, _ := p.reader.Peek(1)
-	if len(b) > 0 && b[0] == JSON_QUOTE {
-		p.reader.ReadByte()
-	}
-}
-
-func (p *JSONProtocol) readNumeric() (Numeric, error) {
-	isNull, err := p.readIfNull()
-	if isNull || err != nil {
-		return NUMERIC_NULL, err
-	}
-	hasDecimalPoint := false
-	nextCanBeSign := true
-	hasE := false
-	MAX_LEN := 40
-	buf := bytes.NewBuffer(make([]byte, 0, MAX_LEN))
-	continueFor := true
-	inQuotes := false
-	for continueFor {
-		c, err := p.reader.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return NUMERIC_NULL, NewTProtocolException(err)
-		}
-		switch c {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			buf.WriteByte(c)
-			nextCanBeSign = false
-		case '.':
-			if hasDecimalPoint {
-				e := fmt.Errorf("Unable to parse number with multiple decimal points '%s.'", buf.String())
-				return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			if hasE {
-				e := fmt.Errorf("Unable to parse number with decimal points in the exponent '%s.'", buf.String())
-				return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			buf.WriteByte(c)
-			hasDecimalPoint, nextCanBeSign = true, false
-		case 'e', 'E':
-			if hasE {
-				e := fmt.Errorf("Unable to parse number with multiple exponents '%s%c'", buf.String(), c)
-				return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			buf.WriteByte(c)
-			hasE, nextCanBeSign = true, true
-		case '-', '+':
-			if !nextCanBeSign {
-				e := fmt.Errorf("Negative sign within number")
-				return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-			buf.WriteByte(c)
-			nextCanBeSign = false
-		case ' ', 0, '\t', '\n', '\r', JSON_RBRACE[0], JSON_RBRACKET[0], JSON_COMMA[0], JSON_COLON[0]:
-			p.reader.UnreadByte()
-			continueFor = false
-		case JSON_NAN[0]:
-			if buf.Len() == 0 {
-				buffer := make([]byte, len(JSON_NAN))
-				buffer[0] = c
-				_, e := p.reader.Read(buffer[1:])
-				if e != nil {
-					return NUMERIC_NULL, NewTProtocolException(e)
-				}
-				if JSON_NAN != string(buffer) {
-					e := mismatch(JSON_NAN, string(buffer))
-					return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-				}
-				if inQuotes {
-					p.readQuoteIfNext()
-				}
-				return NAN, nil
-			} else {
-				e := fmt.Errorf("Unable to parse number starting with character '%c'", c)
-				return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-		case JSON_INFINITY[0]:
-			if buf.Len() == 0 || (buf.Len() == 1 && buf.Bytes()[0] == '+') {
-				buffer := make([]byte, len(JSON_INFINITY))
-				buffer[0] = c
-				_, e := p.reader.Read(buffer[1:])
-				if e != nil {
-					return NUMERIC_NULL, NewTProtocolException(e)
-				}
-				if JSON_INFINITY != string(buffer) {
-					e := mismatch(JSON_INFINITY, string(buffer))
-					return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-				}
-				if inQuotes {
-					p.readQuoteIfNext()
-				}
-				return INFINITY, nil
-			} else if buf.Len() == 1 && buf.Bytes()[0] == JSON_NEGATIVE_INFINITY[0] {
-				buffer := make([]byte, len(JSON_NEGATIVE_INFINITY))
-				buffer[0] = JSON_NEGATIVE_INFINITY[0]
-				buffer[1] = c
-				_, e := p.reader.Read(buffer[2:])
-				if e != nil {
-					return NUMERIC_NULL, NewTProtocolException(e)
-				}
-				if JSON_NEGATIVE_INFINITY != string(buffer) {
-					e := mismatch(JSON_NEGATIVE_INFINITY, string(buffer))
-					return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-				}
-				if inQuotes {
-					p.readQuoteIfNext()
-				}
-				return NEGATIVE_INFINITY, nil
-			} else {
-				e := fmt.Errorf("Unable to parse number starting with character '%c' due to existing buffer %s", c, buf.String())
-				return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-			}
-		case JSON_QUOTE:
-			if !inQuotes {
-				inQuotes = true
-			} else {
-				break
-			}
-		default:
-			e := fmt.Errorf("Unable to parse number starting with character '%c'", c)
-			return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-		}
-	}
-	if buf.Len() == 0 {
-		e := fmt.Errorf("Unable to parse number from empty string ''")
-		return NUMERIC_NULL, NewTProtocolExceptionWithType(INVALID_DATA, e)
-	}
-	return NewNumericFromJSONString(buf.String(), false), nil
 }
