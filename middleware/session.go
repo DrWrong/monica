@@ -85,7 +85,7 @@ func (manager *Manager) getProvider() Provider {
 	var provider Provider
 	switch manager.opt.Provider {
 	case "redis":
-		provider = newRedisProvider()
+		provider = newRedisProvider(int(manager.opt.Cookielifttime))
 	default:
 		panic(fmt.Sprintf("provider %s not support", manager.opt.Provider))
 	}
@@ -121,11 +121,12 @@ func (manager *Manager) Start(ctx *core.Context) (Sessioner, error) {
 }
 
 type RedisProvider struct {
-	redisPool *redis.Pool
+	redisPool      *redis.Pool
+	CookieLifeTime int
 }
 
-func newRedisProvider() Provider {
-	return &RedisProvider{}
+func newRedisProvider(cookieLifetime int) Provider {
+	return &RedisProvider{CookieLifeTime: cookieLifetime}
 }
 
 // 初始化redis pool
@@ -190,7 +191,10 @@ func (provider *RedisProvider) startSession(sid string, conn redis.Conn, option 
 	conn.Send("HSET", getRedisKey(sid), "createtime", time.Now().Unix())
 	if option.Cookielifttime > 0 {
 		conn.Send("EXPIRE", getRedisKey(sid), option.Cookielifttime)
+	} else {
+		conn.Send("EXPIRE", getRedisKey(sid), 30*24*60*60)
 	}
+
 	replay, err := conn.Do("EXEC")
 	if err != nil {
 		return nil, false, err
@@ -219,7 +223,12 @@ func (provider *RedisProvider) Destroy(sid string) error {
 func (provider *RedisProvider) Exist(sid string) (bool, error) {
 	conn := provider.redisPool.Get()
 	defer conn.Close()
-	return redis.Bool(conn.Do("EXISTS", getRedisKey(sid)))
+	ok, err := redis.Bool(conn.Do("EXISTS", getRedisKey(sid)))
+	if provider.CookieLifeTime == 0 {
+		conn.Send("EXPIRE", getRedisKey(sid), 30*24*60*60)
+		conn.Flush()
+	}
+	return ok, err
 }
 
 type RedisSessioner struct {
