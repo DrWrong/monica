@@ -3,8 +3,8 @@ package monica
 import (
 	"time"
 
-	"github.com/DrWrong/monica/log"
 	"github.com/DrWrong/monica/config"
+	"github.com/DrWrong/monica/log"
 	"github.com/astaxie/beego/orm"
 	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
@@ -12,7 +12,7 @@ import (
 
 var (
 	RedisPool *redis.Pool
-	dbLogger *log.MonicaLogger
+	dbLogger  *log.MonicaLogger
 )
 
 func init() {
@@ -20,6 +20,7 @@ func init() {
 }
 
 func InitDb() {
+	orm.DefaultRowsLimit = -1
 	orm.RegisterDriver("mysql", orm.DRMySQL)
 	var initOk bool
 	configerMap, _ := config.GlobalConfiger.Map("mysql")
