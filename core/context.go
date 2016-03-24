@@ -11,6 +11,7 @@ import (
 
 	"github.com/DrWrong/monica/core/inject"
 	"github.com/DrWrong/monica/form"
+	"github.com/DrWrong/monica/log"
 	"github.com/astaxie/beego/validation"
 )
 
@@ -28,6 +29,7 @@ type Context struct {
 	parseFormOnce sync.Once
 	// a bool value which control wheather will go on processing
 	stopProcess bool
+	logger      *log.MonicaLogger
 }
 
 func (c *Context) parseForm() {
@@ -50,6 +52,8 @@ func (c *Context) GetClientIp() string {
 func (c *Context) RenderJson(data interface{}) {
 	c.Resp.Header().Set("Content-type", "application/json; charset=utf-8")
 	res, err := json.Marshal(data)
+
+	c.logger.Debugf("processing request %+v ok: response: %s", c.Request, res)
 	if err != nil {
 		panic(err)
 	}
@@ -121,6 +125,7 @@ func NewContext(resp http.ResponseWriter, req *http.Request) *Context {
 		Injector: inject.New(),
 		Request:  req,
 		Resp:     resp,
+		logger:   log.GetLogger("/monica/core/context"),
 	}
 	c.Map(c)
 	return c
