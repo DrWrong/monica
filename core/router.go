@@ -39,9 +39,8 @@ func newProcessor(handlers []Handler, kwargs map[string]string) func(http.Respon
 
 func GetProcessor(urlPath string) (func(http.ResponseWriter, *http.Request), error) {
 	kwargs := make(map[string]string, 0)
-	handlers := root.Handlers
-	log.Debugf("%+v", root.Handlers)
-
+	handlers := make([]Handler, 0, len(root.Handlers))
+	handlers = append(handlers, root.Handlers...)
 	for _, node := range root.SubNodes {
 		if urlDispatcher(node, urlPath, &handlers, kwargs) {
 			return newProcessor(handlers, kwargs), nil
