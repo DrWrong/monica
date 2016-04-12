@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DrWrong/monica/core/inject"
 	"github.com/DrWrong/monica/form"
@@ -29,6 +30,7 @@ type Context struct {
 	parseFormOnce sync.Once
 	// a bool value which control wheather will go on processing
 	stopProcess bool
+	timerStart  time.Time
 	logger      *log.MonicaLogger
 }
 
@@ -53,10 +55,14 @@ func (c *Context) RenderJson(data interface{}) {
 	c.Resp.Header().Set("Content-type", "application/json; charset=utf-8")
 	res, err := json.Marshal(data)
 
-	c.logger.Debugf("processing request %+v ok: response: %s", c.Request, res)
 	if err != nil {
 		panic(err)
 	}
+
+	c.logger.Debugf(
+		"REQUESET: %+v RESPONSE: %s COST: %f ms",
+		c.Request, res, time.Since(c.timerStart).Seconds()*1000)
+
 	c.Resp.Write(res)
 	c.stopProcess = true
 }
@@ -122,10 +128,11 @@ func (c *Context) run() {
 
 func NewContext(resp http.ResponseWriter, req *http.Request) *Context {
 	c := &Context{
-		Injector: inject.New(),
-		Request:  req,
-		Resp:     resp,
-		logger:   log.GetLogger("/monica/core/context"),
+		Injector:   inject.New(),
+		Request:    req,
+		Resp:       resp,
+		logger:     log.GetLogger("/monica/core/context"),
+		timerStart: time.Now(),
 	}
 	c.Map(c)
 	return c

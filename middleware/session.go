@@ -114,6 +114,8 @@ func (manager *Manager) Start(ctx *core.Context) (Sessioner, error) {
 	}
 	if manager.opt.Cookielifttime > 0 {
 		cookie.Expires = time.Now().Add(time.Duration(manager.opt.Cookielifttime) * time.Second)
+	} else {
+		cookie.Expires = time.Now().Add(time.Duration(366 * 24) * time.Hour)
 	}
 
 	ctx.SetCookie(cookie)
