@@ -67,6 +67,11 @@ func (c *Context) RenderJson(data interface{}) {
 	c.stopProcess = true
 }
 
+func (c *Context) Render(data []byte) {
+	c.Resp.Write(data)
+	c.stopProcess = true
+}
+
 // get Cookie
 // try get cookie from cookie itself
 // if cookie not support for example: app rest then use query
