@@ -21,6 +21,7 @@ package thrift
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -30,6 +31,7 @@ type THttpClient struct {
 	response           *http.Response
 	url                *url.URL
 	requestBuffer      *bytes.Buffer
+	header             http.Header
 	nsecConnectTimeout int64
 	nsecReadTimeout    int64
 }
@@ -85,7 +87,37 @@ func NewTHttpPostClient(urlstr string) (TTransport, error) {
 		return nil, err
 	}
 	buf := make([]byte, 0, 1024)
-	return &THttpClient{url: parsedURL, requestBuffer: bytes.NewBuffer(buf)}, nil
+	return &THttpClient{url: parsedURL, requestBuffer: bytes.NewBuffer(buf), header: http.Header{}}, nil
+}
+
+// Set the HTTP Header for this specific Thrift Transport
+// It is important that you first assert the TTransport as a THttpClient type
+// like so:
+//
+// httpTrans := trans.(THttpClient)
+// httpTrans.SetHeader("User-Agent","Thrift Client 1.0")
+func (p *THttpClient) SetHeader(key string, value string) {
+	p.header.Add(key, value)
+}
+
+// Get the HTTP Header represented by the supplied Header Key for this specific Thrift Transport
+// It is important that you first assert the TTransport as a THttpClient type
+// like so:
+//
+// httpTrans := trans.(THttpClient)
+// hdrValue := httpTrans.GetHeader("User-Agent")
+func (p *THttpClient) GetHeader(key string) string {
+	return p.header.Get(key)
+}
+
+// Deletes the HTTP Header given a Header Key for this specific Thrift Transport
+// It is important that you first assert the TTransport as a THttpClient type
+// like so:
+//
+// httpTrans := trans.(THttpClient)
+// httpTrans.DelHeader("User-Agent")
+func (p *THttpClient) DelHeader(key string) {
+	p.header.Del(key)
 }
 
 func (p *THttpClient) Open() error {
@@ -97,21 +129,22 @@ func (p *THttpClient) IsOpen() bool {
 	return p.response != nil || p.requestBuffer != nil
 }
 
-func (p *THttpClient) Peek() bool {
-	return p.IsOpen()
+func (p *THttpClient) closeResponse() error {
+	var err error
+	if p.response != nil && p.response.Body != nil {
+		err = p.response.Body.Close()
+	}
+
+	p.response = nil
+	return err
 }
 
 func (p *THttpClient) Close() error {
-	if p.response != nil && p.response.Body != nil {
-		err := p.response.Body.Close()
-		p.response = nil
-		return err
-	}
 	if p.requestBuffer != nil {
 		p.requestBuffer.Reset()
 		p.requestBuffer = nil
 	}
-	return nil
+	return p.closeResponse()
 }
 
 func (p *THttpClient) Read(buf []byte) (int, error) {
@@ -119,7 +152,14 @@ func (p *THttpClient) Read(buf []byte) (int, error) {
 		return 0, NewTTransportException(NOT_OPEN, "Response buffer is empty, no request.")
 	}
 	n, err := p.response.Body.Read(buf)
+	if n > 0 && (err == nil || err == io.EOF) {
+		return n, nil
+	}
 	return n, NewTTransportExceptionFromError(err)
+}
+
+func (p *THttpClient) ReadByte() (c byte, err error) {
+	return readByte(p.response.Body)
 }
 
 func (p *THttpClient) Write(buf []byte) (int, error) {
@@ -127,15 +167,46 @@ func (p *THttpClient) Write(buf []byte) (int, error) {
 	return n, err
 }
 
+func (p *THttpClient) WriteByte(c byte) error {
+	return p.requestBuffer.WriteByte(c)
+}
+
+func (p *THttpClient) WriteString(s string) (n int, err error) {
+	return p.requestBuffer.WriteString(s)
+}
+
 func (p *THttpClient) Flush() error {
-	response, err := http.Post(p.url.String(), "application/x-thrift", p.requestBuffer)
+	// Close any previous response body to avoid leaking connections.
+	p.closeResponse()
+
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", p.url.String(), p.requestBuffer)
+	if err != nil {
+		return NewTTransportExceptionFromError(err)
+	}
+	p.header.Add("Content-Type", "application/x-thrift")
+	req.Header = p.header
+	response, err := client.Do(req)
 	if err != nil {
 		return NewTTransportExceptionFromError(err)
 	}
 	if response.StatusCode != http.StatusOK {
+		// Close the response to avoid leaking file descriptors.
+		response.Body.Close()
 		// TODO(pomack) log bad response
 		return NewTTransportException(UNKNOWN_TRANSPORT_EXCEPTION, "HTTP Response code: "+strconv.Itoa(response.StatusCode))
 	}
 	p.response = response
 	return nil
 }
+
+func (p *THttpClient) RemainingBytes() (num_bytes uint64) {
+	len := p.response.ContentLength 
+	if len >= 0 {
+		return uint64(len)
+	}
+	
+	const maxSize = ^uint64(0)
+	return maxSize  // the thruth is, we just don't know unless framed is used
+}
+

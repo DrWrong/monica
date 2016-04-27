@@ -64,10 +64,6 @@ func (p *TMemoryBuffer) Open() error {
 	return nil
 }
 
-func (p *TMemoryBuffer) Peek() bool {
-	return p.IsOpen()
-}
-
 func (p *TMemoryBuffer) Close() error {
 	p.Buffer.Reset()
 	return nil
@@ -76,4 +72,8 @@ func (p *TMemoryBuffer) Close() error {
 // Flushing a memory buffer is a no-op
 func (p *TMemoryBuffer) Flush() error {
 	return nil
+}
+
+func (p *TMemoryBuffer) RemainingBytes() (num_bytes uint64) {
+	return uint64(p.Buffer.Len())
 }

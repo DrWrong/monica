@@ -20,13 +20,18 @@
 package thrift
 
 import (
+	"crypto/tls"
 	"net"
 	"time"
-	"crypto/tls"
 )
 
 type TSSLSocket struct {
-	conn    net.Conn
+	conn net.Conn
+	// hostPort contains host:port (e.g. "asdf.com:12345"). The field is
+	// only valid if addr is nil.
+	hostPort string
+	// addr is nil when hostPort is not "", and is only used when the
+	// TSSLSocket is constructed from a net.Addr.
 	addr    net.Addr
 	timeout time.Duration
 	cfg     *tls.Config
@@ -35,7 +40,7 @@ type TSSLSocket struct {
 // NewTSSLSocket creates a net.Conn-backed TTransport, given a host and port and tls Configuration
 //
 // Example:
-// 	trans, err := thrift.NewTSocket("localhost:9090")
+// 	trans, err := thrift.NewTSSLSocket("localhost:9090", nil)
 func NewTSSLSocket(hostPort string, cfg *tls.Config) (*TSSLSocket, error) {
 	return NewTSSLSocketTimeout(hostPort, cfg, 0)
 }
@@ -43,12 +48,7 @@ func NewTSSLSocket(hostPort string, cfg *tls.Config) (*TSSLSocket, error) {
 // NewTSSLSocketTimeout creates a net.Conn-backed TTransport, given a host and port
 // it also accepts a tls Configuration and a timeout as a time.Duration
 func NewTSSLSocketTimeout(hostPort string, cfg *tls.Config, timeout time.Duration) (*TSSLSocket, error) {
-	//conn, err := net.DialTimeout(network, address, timeout)
-	addr, err := net.ResolveTCPAddr("tcp", hostPort)
-	if err != nil {
-		return nil, err
-	}
-	return NewTSSLSocketFromAddrTimeout(addr, cfg, timeout), nil
+	return &TSSLSocket{hostPort: hostPort, timeout: timeout, cfg: cfg}, nil
 }
 
 // Creates a TSSLSocket from a net.Addr
@@ -83,26 +83,34 @@ func (p *TSSLSocket) pushDeadline(read, write bool) {
 
 // Connects the socket, creating a new socket object if necessary.
 func (p *TSSLSocket) Open() error {
-	if p.IsOpen() {
-		return NewTTransportException(ALREADY_OPEN, "Socket already connected.")
-	}
-	if p.addr == nil {
-		return NewTTransportException(NOT_OPEN, "Cannot open nil address.")
-	}
-	if len(p.addr.Network()) == 0 {
-		return NewTTransportException(NOT_OPEN, "Cannot open bad network name.")
-	}
-	if len(p.addr.String()) == 0 {
-		return NewTTransportException(NOT_OPEN, "Cannot open bad address.")
-	}
 	var err error
-	if p.conn, err = tls.Dial(p.addr.Network(), p.addr.String(), p.cfg); err != nil {
-		return NewTTransportException(NOT_OPEN, err.Error())
+	// If we have a hostname, we need to pass the hostname to tls.Dial for
+	// certificate hostname checks.
+	if p.hostPort != "" {
+		if p.conn, err = tls.Dial("tcp", p.hostPort, p.cfg); err != nil {
+			return NewTTransportException(NOT_OPEN, err.Error())
+		}
+	} else {
+		if p.IsOpen() {
+			return NewTTransportException(ALREADY_OPEN, "Socket already connected.")
+		}
+		if p.addr == nil {
+			return NewTTransportException(NOT_OPEN, "Cannot open nil address.")
+		}
+		if len(p.addr.Network()) == 0 {
+			return NewTTransportException(NOT_OPEN, "Cannot open bad network name.")
+		}
+		if len(p.addr.String()) == 0 {
+			return NewTTransportException(NOT_OPEN, "Cannot open bad address.")
+		}
+		if p.conn, err = tls.Dial(p.addr.Network(), p.addr.String(), p.cfg); err != nil {
+			return NewTTransportException(NOT_OPEN, err.Error())
+		}
 	}
 	return nil
 }
 
-// Retreive the underlying net.Conn
+// Retrieve the underlying net.Conn
 func (p *TSSLSocket) Conn() net.Conn {
 	return p.conn
 }
@@ -145,10 +153,6 @@ func (p *TSSLSocket) Write(buf []byte) (int, error) {
 	return p.conn.Write(buf)
 }
 
-func (p *TSSLSocket) Peek() bool {
-	return p.IsOpen()
-}
-
 func (p *TSSLSocket) Flush() error {
 	return nil
 }
@@ -159,3 +163,9 @@ func (p *TSSLSocket) Interrupt() error {
 	}
 	return p.conn.Close()
 }
+
+func (p *TSSLSocket) RemainingBytes() (num_bytes uint64) {
+	const maxSize = ^uint64(0)
+	return maxSize  // the thruth is, we just don't know unless framed is used
+}
+

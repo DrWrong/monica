@@ -28,6 +28,11 @@ func Bind(kwargs url.Values, form interface{}) {
 		field := formType.Field(i)
 
 		form_name := field.Tag.Get("form")
+
+		if form_name == "-" {
+			continue
+		}
+
 		if form_name == "" {
 			// 将驼峰转化成下划线
 			re := regexp.MustCompile("[A-Z]")
