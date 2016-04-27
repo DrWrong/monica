@@ -112,18 +112,6 @@ func mismatch(expected, actual string) error {
 }
 
 func (p *JSONProtocol) WriteMessageBegin(name string, typeId TMessageType, seqId int32) error {
-	if e := p.OutputListBegin(); e != nil {
-		return e
-	}
-	if e := p.WriteString(name); e != nil {
-		return e
-	}
-	if e := p.WriteByte(byte(typeId)); e != nil {
-		return e
-	}
-	if e := p.WriteI32(seqId); e != nil {
-		return e
-	}
 	return nil
 }
 
@@ -157,16 +145,7 @@ func (p *JSONProtocol) WriteFieldEnd() error {
 func (p *JSONProtocol) WriteFieldStop() error { return nil }
 
 func (p *JSONProtocol) WriteMapBegin(keyType TType, valueType TType, size int) error {
-	if e := p.OutputListBegin(); e != nil {
-		return e
-	}
-	if e := p.WriteByte(byte(keyType)); e != nil {
-		return e
-	}
-	if e := p.WriteByte(byte(valueType)); e != nil {
-		return e
-	}
-	return p.WriteI32(int32(size))
+	return nil
 }
 
 func (p *JSONProtocol) WriteMapEnd() error {
@@ -193,7 +172,7 @@ func (p *JSONProtocol) WriteBool(b bool) error {
 	return p.OutputBool(b)
 }
 
-func (p *JSONProtocol) WriteByte(b byte) error {
+func (p *JSONProtocol) WriteByte(b int8) error {
 	return p.WriteI32(int32(b))
 }
 
@@ -295,13 +274,14 @@ func (p *JSONProtocol) ReadBool() (bool, error) {
 	return false, nil
 }
 
-func (p *JSONProtocol) ReadByte() (byte, error) {
+func (p *JSONProtocol) ReadByte() (int8, error) {
 	return 0, nil
 }
 
 func (p *JSONProtocol) ReadI16() (int16, error) {
 	return 0, nil
 }
+
 
 func (p *JSONProtocol) ReadI32() (int32, error) {
 	return 0, nil
