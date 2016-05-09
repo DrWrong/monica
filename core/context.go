@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +19,23 @@ import (
 
 type Handler interface{}
 
+var privateIpNets [3]*net.IPNet
+
+func init() {
+	_, aNet, _ := net.ParseCIDR("10.0.0.0/8")
+	_, bNet, _ := net.ParseCIDR("172.16.0.0/12")
+	_, cNet, _ := net.ParseCIDR("192.168.0.0/16")
+	privateIpNets = [3]*net.IPNet{aNet, bNet, cNet}
+}
+
+func isPrivateIp(ip net.IP) bool {
+	for _, net := range privateIpNets {
+		if net.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
 // the base class for the web framework
 // it provide a context for each request
 type Context struct {
@@ -47,8 +65,24 @@ func (c *Context) QueryInt(name string) (int, error) {
 }
 
 func (c *Context) GetClientIp() string {
-	return strings.Split(c.RemoteAddr, ":")[0]
-
+	// firstly get remote addr and judge if it is a global ip address
+	ipAddress := strings.Split(c.RemoteAddr, ":")[0]
+	ip := net.ParseIP(ipAddress)
+	if ip.IsGlobalUnicast() && !isPrivateIp(ip){
+		return ipAddress
+	}
+	// if not get ip from X-Forwarded-For
+	forwardedIpAddress := c.Header.Get("X-Forwarded-For")
+	// if X-Forwarded-For is blank then return real ip
+	if forwardedIpAddress == "" {
+		return ipAddress
+	}
+	// cause X-Forwarded-For can be set by user so we examine if it is a validate value
+	forwardedIp := net.ParseIP(forwardedIpAddress)
+	if forwardedIp == nil || forwardedIp.IsUnspecified() {
+		panic("X-Forwarded-For not validate")
+	}
+	return forwardedIpAddress
 }
 
 func (c *Context) RenderJson(data interface{}) {
