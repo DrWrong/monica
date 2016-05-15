@@ -132,8 +132,8 @@ func (c *Context) Next() {
 	c.run()
 }
 
-func (c *Context) Bind(formStruct interface{}) (bool, error) {
-	form.Bind(c.Form, formStruct)
+func (c *Context) Bind(formStruct interface{}, fields ...string) (bool, error) {
+	form.Bind(c.Form, formStruct, fields...)
 	valid := validation.Validation{}
 	b, err := valid.Valid(formStruct)
 	if err != nil {

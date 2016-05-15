@@ -8,7 +8,16 @@ import (
 	"strings"
 )
 
-func Bind(kwargs url.Values, form interface{}) {
+func inStringSlice(ele string, list []string) bool {
+	for _, field := range list {
+		if ele == field {
+			return true
+		}
+	}
+	return false
+}
+
+func Bind(kwargs url.Values, form interface{}, fields ...string) {
 	ptrFormValue := reflect.ValueOf(form)
 	if ptrFormValue.Kind() != reflect.Ptr {
 		panic("you should bind to a pointer to a struct")
@@ -25,7 +34,12 @@ func Bind(kwargs url.Values, form interface{}) {
 		if !fieldValue.CanSet() {
 			continue
 		}
+
 		field := formType.Field(i)
+
+		if len(fields) != 0 && !inStringSlice(field.Name, fields) {
+			continue
+		}
 
 		form_name := field.Tag.Get("form")
 
