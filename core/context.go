@@ -36,6 +36,7 @@ func isPrivateIp(ip net.IP) bool {
 	}
 	return false
 }
+
 // the base class for the web framework
 // it provide a context for each request
 type Context struct {
@@ -68,7 +69,7 @@ func (c *Context) GetClientIp() string {
 	// firstly get remote addr and judge if it is a global ip address
 	ipAddress := strings.Split(c.RemoteAddr, ":")[0]
 	ip := net.ParseIP(ipAddress)
-	if ip.IsGlobalUnicast() && !isPrivateIp(ip){
+	if ip.IsGlobalUnicast() && !isPrivateIp(ip) {
 		return ipAddress
 	}
 	// if not get ip from X-Forwarded-For
@@ -132,21 +133,21 @@ func (c *Context) Next() {
 	c.run()
 }
 
-func (c *Context) Bind(formStruct interface{}, fields ...string) (bool, error) {
+func (c *Context) Bind(formStruct interface{}, fields ...string) error {
 	form.Bind(c.Form, formStruct, fields...)
 	valid := validation.Validation{}
 	b, err := valid.Valid(formStruct)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if b {
-		return true, nil
+		return nil
 	}
 	res := ""
 	for _, err := range valid.Errors {
 		res += fmt.Sprintf("%s\n", err.Message)
 	}
-	return false, errors.New(res)
+	return errors.New(res)
 }
 
 func (c *Context) run() {
