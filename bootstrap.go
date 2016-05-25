@@ -13,11 +13,13 @@ import (
 	"github.com/DrWrong/monica/core"
 	"github.com/DrWrong/monica/log"
 	"github.com/DrWrong/monica/thrift"
+	"github.com/astaxie/beego/validation"
 )
 
 var (
 	bootStrapLogger *log.MonicaLogger
 	thriftServer    *thrift.TSimpleServer
+	GlobalLang      string
 )
 
 func init() {
@@ -32,6 +34,7 @@ func init() {
 	log.InitLoggerFromConfigure(config.GlobalConfiger)
 	println("init logger ok")
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
+	initDefaultLang()
 	go func() {
 		for {
 			c := make(chan os.Signal)
@@ -49,6 +52,7 @@ func init() {
 
 		}
 	}()
+
 }
 
 func BootStrap(customizedConfig func()) {
@@ -110,4 +114,39 @@ func initGlobalConfiger() {
 		return
 	}
 	panic("no config file found!!!")
+}
+
+// config i18n
+func initDefaultLang() {
+	GlobalLang := config.GlobalConfiger.String("default::lang")
+	if GlobalLang == "" {
+		GlobalLang = "zh-CN"
+	}
+
+	// config beego validatetion to realize i18n
+	if GlobalLang == "zh-CN" {
+		validation.MessageTmpls = map[string]string{
+			"Required":     "输入不能为空",
+			"Min":          "输入最小值是 %d",
+			"Max":          "输入最大值是 %d",
+			"Range":        "输入必须介于 %d 到 %d 之间",
+			"MinSize":      "输入最小长度 %d",
+			"MaxSize":      "输入最大长度 %d",
+			"Length":       "输入长度需要是 %d",
+			"Alpha":        "输入必须是有效的字母",
+			"Numeric":      "输入必须为数字",
+			"AlphaNumeric": "输入必须是字母或数字",
+			"Match":        "无效的输入",
+			"NoMatch":      "无效的输入",
+			"AlphaDash":    "输入必须是字母数字或下划线组合",
+			"Email":        "输入必须是有效的邮箱",
+			"IP":           "输入必须是有效ip地址",
+			"Base64":       "输入必须是有效的base64",
+			"Mobile":       "输入必须是有效的手机号",
+			"Tel":          "输入必须是有效的电话号",
+			"Phone":        "输入必须是有效的手机号或电话号",
+			"ZipCode":      "输入必须是有效的邮编",
+		}
+
+	}
 }

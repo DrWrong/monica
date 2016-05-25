@@ -144,7 +144,7 @@ func (c *Context) Bind(formStruct interface{}, fields ...string) (bool, error) {
 	}
 	res := ""
 	for _, err := range valid.Errors {
-		res += fmt.Sprintf("%s: %s;", err.Key, err.Message)
+		res += fmt.Sprintf("%s\n", err.Message)
 	}
 	return false, errors.New(res)
 }

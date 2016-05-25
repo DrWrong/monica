@@ -56,7 +56,7 @@ func Bind(kwargs url.Values, form interface{}, fields ...string) {
 		}
 
 		value := kwargs.Get(form_name)
-
+		value = strings.TrimSpace(value)
 		if value == "" {
 			continue
 		}
