@@ -5,9 +5,25 @@
         args:
           baseFileName: log_file.log
           formatter: "{{.Time.String }}  {{.Level.String }} {{.FileName }} {{.FuncName}} {{ .LineNo}} {{ .Message }} \n"
+      - name: yamlTimeRotatingFileHandler
+        type: TimeRotatingFileHandler
+        args:
+          baseFileName: time_rotating_handler.log
+          formatter: "{{.Message}}\n"
+          when: "D"
+          backupCount: 10
+      - name: yamlRedisHandler
+        type: RedisHandler
+        args:
+          formatter: "{{.Message}}\n"
+          key: "test_redis_handler"
+          address: "10.0.0.206:6395"
+          db: 8
     loggers:
-      - name: /monica/filelogger
+      - name: /monica/logger
         handlers:
           - yamlfileHandler
+          - yamlTimeRotatingFileHandler
+          - yamlRedisHandler
         level: debug
         propagte: false

@@ -13,7 +13,7 @@ func TestGetLogger(t *testing.T) {
 		&HandlerOption{
 			Name: "fileHandler",
 			Type: "FileHandler",
-			Args: map[string]string{
+			Args: map[string]interface{}{
 				"baseFileName": "logger_test.log",
 				"formatter":    formatter,
 			},
@@ -33,9 +33,12 @@ func TestGetLogger(t *testing.T) {
 	logger.Debug("test get logger")
 }
 
-func TestFileLogger(t *testing.T) {
+func TestLogger(t *testing.T) {
 	ConfigFromFile("log.yaml")
-	logger := GetLogger("/monica/filelogger")
+	t.Logf("%+v", loggerMap)
+
+	logger := GetLogger("/monica/logger")
+	logger.Debug("hello")
 	t.Log(logger.loggerName)
 	logger.Debug("test file logger")
 }

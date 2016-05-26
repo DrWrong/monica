@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -12,6 +13,8 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
 )
 
 type Handler interface {
@@ -41,7 +44,7 @@ type Rotator interface {
 }
 
 type BaseHandler struct {
-	writer      io.Writer
+	writer      io.WriteCloser
 	logTemplate *template.Template
 }
 
@@ -49,16 +52,13 @@ func (handler *BaseHandler) Handle(record *Record) error {
 	return errors.New("not implement")
 }
 
+// file handler process file
 type FileHandler struct {
 	*BaseHandler
 	baseFileName string
 }
 
-func (handler *FileHandler) open() (io.Writer, error) {
-	return os.OpenFile(handler.baseFileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-
-}
-
+// new a file handler
 func NewFileHandler(baseFileName, formatter string) (*FileHandler, error) {
 	logTemplate := template.Must(template.New("logTemplate").Parse(formatter))
 	handler := &FileHandler{
@@ -71,6 +71,30 @@ func NewFileHandler(baseFileName, formatter string) (*FileHandler, error) {
 	}
 	handler.writer = writer
 	return handler, nil
+}
+
+// provide a global method to new a file handler
+func NewFileHandlerFactory(args map[string]interface{}) (Handler, error) {
+	args1, ok := args["baseFileName"]
+	if !ok {
+		return nil, errors.New("baseFileName not exist in args")
+	}
+	baseFileName := path.Join(os.Getenv("MONIC_RUNDIR"), args1.(string))
+	formatter, ok := args["formatter"]
+	if !ok {
+		return nil, errors.New("formatter not exist in args")
+	}
+	handler, err := NewFileHandler(baseFileName, formatter.(string))
+	if err != nil {
+		return nil, err
+	}
+	return NewThreadSafeHandler(handler), nil
+
+}
+
+func (handler *FileHandler) open() (io.WriteCloser, error) {
+	return os.OpenFile(handler.baseFileName, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+
 }
 
 func (handler *FileHandler) Handle(record *Record) error {
@@ -107,6 +131,39 @@ func NewTimeRotatingFileHandler(baseFileName, formatter, when string, backupCoun
 		handler: fileHandler,
 		rotator: rotator,
 	}, nil
+}
+
+func NewTimeRotatingFileHandlerFactory(args map[string]interface{}) (Handler, error) {
+
+	args1, ok := args["baseFileName"]
+	if !ok {
+		return nil, errors.New("baseFileName not exist in args")
+	}
+	baseFileName := path.Join(os.Getenv("MONIC_RUNDIR"), args1.(string))
+	formatter, ok := args["formatter"]
+	if !ok {
+		return nil, errors.New("formatter not exist in args")
+	}
+
+	when, ok := args["when"]
+	if !ok {
+		return nil, errors.New("when not exist in args")
+	}
+
+	backupCount, ok := args["backupCount"]
+	if !ok {
+		return nil, errors.New("backupCount not exist in args")
+	}
+
+	handler, err := NewTimeRotatingFileHandler(
+		baseFileName, formatter.(string), when.(string), backupCount.(int))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return NewThreadSafeHandler(handler), nil
+
 }
 
 type TimeRotator struct {
@@ -176,8 +233,9 @@ func (rotator *TimeRotator) shouldRollover(record *Record) bool {
 
 func (rotator *TimeRotator) doRollover() {
 	if rotator.writer != nil {
-		file := rotator.writer.(*os.File)
-		file.Close()
+		// file := rotator.writer.(*os.File)
+		// file.Close()
+		rotator.writer.Close()
 		rotator.writer = nil
 	}
 	t := time.Unix(rotator.rolloverAt-rotator.interval, 0)
@@ -227,4 +285,85 @@ func (rotator *TimeRotator) getFilesToDelete() []string {
 		result = result[:len(result)-rotator.BackupCount]
 	}
 	return result
+}
+
+// send the log to a redis queue
+type RedisHandler struct {
+	Key         string
+	logTemplate *template.Template
+	pool        *redis.Pool
+}
+
+func (handler *RedisHandler) Handle(record *Record) error {
+	conn := handler.pool.Get()
+	defer conn.Close()
+	result, err := record.Bytes(handler.logTemplate)
+	if err != nil {
+		return err
+	}
+	conn.Send("LPUSH", handler.Key, result)
+	return conn.Flush()
+}
+
+// Redis handler factory
+func NewRedisHandlerFactory(args map[string]interface{}) (Handler, error) {
+	key, ok := args["key"]
+	if !ok {
+		return nil, errors.New("key not exist in args")
+	}
+
+	address, ok := args["address"]
+	if !ok {
+		return nil, errors.New("address not exist in args")
+	}
+
+	db, ok := args["db"]
+	if !ok {
+		return nil, errors.New("db not exist in args")
+	}
+
+	formatter, ok := args["formatter"]
+	if !ok {
+		return nil, errors.New("formatter not exit in args")
+	}
+	logTemplate := template.Must(template.New("logTemplate").Parse(formatter.(string)))
+
+	pool := &redis.Pool{
+		MaxIdle:     5,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", address.(string))
+			if err != nil {
+				println(err)
+				return nil, err
+			}
+			_, err = c.Do("SELECT", db.(int))
+			if err != nil {
+				println(err)
+				return nil, err
+			}
+			return c, nil
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			if err != nil {
+				println(err)
+			}
+			return err
+
+		},
+	}
+
+	return &RedisHandler{
+		Key:         key.(string),
+		logTemplate: logTemplate,
+		pool:        pool,
+	}, nil
+}
+
+
+func init() {
+	RegisterHandlerInitFunction("FileHandler", NewFileHandlerFactory)
+	RegisterHandlerInitFunction("TimeRotatingFileHandler", NewTimeRotatingFileHandlerFactory)
+	RegisterHandlerInitFunction("RedisHandler", NewRedisHandlerFactory)
 }

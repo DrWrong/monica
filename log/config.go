@@ -1,46 +1,44 @@
 package log
 
 import (
-	"os"
-	"path"
-	"strconv"
+	"fmt"
 
 	"github.com/DrWrong/monica/config"
 )
 
 var (
-	handlersMap map[string]Handler
+	handlersMap map[string]Handler = map[string]Handler{}
+
+	handlerInitFunction map[string]FactoryFunc = map[string]FactoryFunc{}
 )
 
+func RegisterHandlerInitFunction(name string, initFunction FactoryFunc) {
+	handlerInitFunction[name] = initFunction
+}
+
+// handler factory funct to create handler
+type FactoryFunc func(map[string]interface{}) (Handler, error)
+
+// the necessary options to init a handler
 type HandlerOption struct {
 	Name string
 	Type string
-	Args map[string]string
+	Args map[string]interface{}
 }
 
+// a global init handler method
 func (option *HandlerOption) InitHandler() {
-	var handler Handler
-	var err error
-	switch option.Type {
-	case "FileHandler":
-		baseFileName := option.Args["baseFileName"]
-		baseFileName = path.Join(os.Getenv("MONICA_RUNDIR"), baseFileName)
-		formatter := option.Args["formatter"]
-		handler, err = NewFileHandler(baseFileName, formatter)
-	case "TimeRotatingFileHandler":
-		baseFileName := option.Args["baseFileName"]
-		baseFileName = path.Join(os.Getenv("MONICA_RUNDIR"), baseFileName)
-		formatter := option.Args["formatter"]
-		when := option.Args["when"]
-		backupCount, _ := strconv.Atoi(option.Args["backupCount"])
-		handler, err = NewTimeRotatingFileHandler(baseFileName, formatter, when, backupCount)
-	default:
+	factoryFunc, ok := handlerInitFunction[option.Type]
+	if !ok {
 		panic("not support handler type")
 	}
-	if err != nil{
+
+	handler, err := factoryFunc(option.Args)
+	if err != nil {
 		panic(err)
 	}
-	handlersMap[option.Name] = NewThreadSafeHandler(handler)
+
+	handlersMap[option.Name] = handler
 }
 
 type LoggerOption struct {
@@ -53,7 +51,11 @@ type LoggerOption struct {
 func (option *LoggerOption) InitLogger() {
 	handlers := make([]Handler, 0, len(option.HandlerNames))
 	for _, handlerName := range option.HandlerNames {
-		handlers = append(handlers, handlersMap[handlerName])
+		handler, ok := handlersMap[handlerName]
+		if !ok {
+			panic(fmt.Sprintf("handler %s not exist", handlerName))
+		}
+		handlers = append(handlers, handler)
 	}
 	loggerMap[option.Name] = &MonicaLogger{
 		handlers:   handlers,
@@ -82,14 +84,10 @@ func InitLoggerFromConfigure(configure config.Configer) {
 	handlerOptions := make([]*HandlerOption, 0, len(handlersConfig))
 	for _, config := range handlersConfig {
 		args := config["args"].(map[string]interface{})
-		argsConvert := make(map[string]string, len(args))
-		for key, value := range args {
-			argsConvert[key] = value.(string)
-		}
 		handlerOptions = append(handlerOptions, &HandlerOption{
 			Name: config["name"].(string),
 			Type: config["type"].(string),
-			Args: argsConvert,
+			Args: args,
 		})
 	}
 
@@ -119,8 +117,4 @@ func InitLoggerFromConfigure(configure config.Configer) {
 func ConfigFromFile(filename string) {
 	configure := config.NewYamlConfig(filename)
 	InitLoggerFromConfigure(configure)
-}
-
-func init() {
-	handlersMap = make(map[string]Handler, 0)
 }
