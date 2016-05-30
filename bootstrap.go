@@ -40,24 +40,25 @@ func init() {
 	println("init logger ok")
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
 	initDefaultLang()
-	go func() {
-		for {
-			c := make(chan os.Signal)
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-			//sig is blocked as c is 没缓冲
-			sig := <-c
-			bootStrapLogger.Infof("Signal %d received", sig)
-			if thriftServer != nil {
-				bootStrapLogger.Info("thrift server is going to stop")
-				thriftServer.Stop()
-				bootStrapLogger.Info("thrift server has gone away")
-			}
-			time.Sleep(time.Second)
-			os.Exit(0)
+	go registerSignalHandler()
+}
 
+func regiterSignalHandler() {
+	for {
+		c := make(chan os.Signal)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		//sig is blocked as c is 没缓冲
+		sig := <-c
+		bootStrapLogger.Infof("Signal %d received", sig)
+		if thriftServer != nil {
+			bootStrapLogger.Info("thrift server is going to stop")
+			thriftServer.Stop()
+			bootStrapLogger.Info("thrift server has gone away")
 		}
-	}()
+		time.Sleep(time.Second)
+		os.Exit(0)
 
+	}
 }
 
 // BootStrap a web server
