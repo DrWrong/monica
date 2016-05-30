@@ -1,3 +1,8 @@
+// package monica provide some function like bootstrap or database initiation\n
+// monica do some init functions when it is init\n
+// firstly configure `GOMAXPROCS` to the `CPUNUMBER`\n
+// sencodly it read some a global config file the file is finded in such a order(the `MONICA_CONFIGURE` environment variable, `config.yaml` in the current path, `$GOPATH/conf/monica.yaml`  )\n
+// thridly it init the log system, register singal handler\n
 package monica
 
 import (
@@ -55,6 +60,9 @@ func init() {
 
 }
 
+// BootStrap a web server
+// bootstrap firstly call the customizedConfig to do some init actions required by the upper programs
+// then it start web server
 func BootStrap(customizedConfig func()) {
 	initGloabl(customizedConfig)
 	// now start server
@@ -71,6 +79,7 @@ func initGloabl(customizedConfig func()) {
 
 }
 
+// BootStrap a thrift Server
 func BootStrapThriftServer(processor thrift.TProcessor, customizedConfig func()) {
 	initGloabl(customizedConfig)
 

@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	// global redis pool
 	RedisPool *redis.Pool
 	dbLogger  *log.MonicaLogger
 )
@@ -19,6 +20,11 @@ func init() {
 	dbLogger = log.GetLogger("/monica/database")
 }
 
+
+// init beego `orm` config
+// monica use beego's orm defaultly
+// however we set the `DefaultRowsLimit` to -1 here
+// the function read config from `default::mysql` part of yaml file
 func InitDb() {
 	orm.DefaultRowsLimit = -1
 	orm.RegisterDriver("mysql", orm.DRMySQL)
@@ -43,6 +49,9 @@ func InitDb() {
 
 }
 
+// init redis
+// monica use `redigo` as a redis driver
+// this function read config from config file
 func InitRedis() {
 	address := config.GlobalConfiger.String("redis::address")
 	if address == "" {
