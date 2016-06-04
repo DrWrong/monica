@@ -43,7 +43,7 @@ func init() {
 	go registerSignalHandler()
 }
 
-func regiterSignalHandler() {
+func registerSignalHandler() {
 	for {
 		c := make(chan os.Signal)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
