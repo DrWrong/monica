@@ -36,7 +36,10 @@ func init() {
 		os.Setenv("MONICA_RUNDIR", runDir)
 	}
 	// now config log module
-	log.InitLoggerFromConfigure(config.GlobalConfiger)
+	if err := log.InitLoggerFromConfigure(config.GlobalConfiger); err != nil {
+		fmt.Fprintf(os.Stderr, "init from config error: load default configurre: %s", err)
+	}
+
 	println("init logger ok")
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
 	initDefaultLang()

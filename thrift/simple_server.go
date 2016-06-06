@@ -172,6 +172,7 @@ func (p *TSimpleServer) processRequests(client TTransport) error {
 		defer outputTransport.Close()
 	}
 	for {
+
 		ok, err := processor.Process(inputProtocol, outputProtocol)
 		if err, ok := err.(TTransportException); ok && err.TypeId() == END_OF_FILE {
 			return nil

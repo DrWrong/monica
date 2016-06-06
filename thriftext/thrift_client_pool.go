@@ -3,7 +3,7 @@ package thriftext
 // 本文件实现了一个 go 的 thrift 链接池， 具体使用可以参照测试用例
 import (
 	"container/list"
-	"domob_thrift/common"
+	//"domob_thrift/common"
 	"errors"
 	"fmt"
 	"log"
@@ -43,44 +43,43 @@ type WrappedClient struct {
 }
 
 func (w *WrappedClient) Close() {
+	// 如果client为空就不计较后面的时情了
+	if w.client == nil {
+		return
+	}
 	w.p.put(w)
 }
 
 // 重试机制
 func (w *WrappedClient) CallWithRetry(name string, args ...interface{}) (res interface{}, err error) {
-	res, err = w.Call(name, args...)
-	// 出错后进行重试，链接层的错误一般是服务重启引起的，而服务重启会导致所有的client全部不可用, 这是一个消极的方案。
-	if w.err != nil {
-		// 关闭旧有连接
-		w.Close()
 
-		var i uint
-		for i = 0; i < w.p.MaxRetry; i += 1 {
-			// 如果重试次数超过2次就武断的判定为所有的client都不可以用全都关掉
-			if i == 1 {
-				w.p.closeAllClient()
-			}
-			// sleep 一会
-			t := i
-			if t >= 5 {
-				t = 5
-			}
-			time.Sleep((1 << t) * time.Second)
-
-			// 获取一个新的连接并城市调用
-			w, _ = w.p.Get()
-			res, err = w.Call(name, args...)
-			// 如果调用出错
-			if w.err != nil {
-				// 把新获取到的连接关掉
-				fmt.Printf("retry %d times\n", i)
-				w.Close()
-				continue
-			}
-			return res, err
+	var i uint
+	maxRetry := w.p.MaxRetry
+	for i = 0; i < maxRetry; i += 1 {
+		if i > 0 {
+			fmt.Printf("retry %d times\n", i+1)
 		}
+
+		res, err = w.Call(name, args...)
+		if w.err == nil {
+			return
+		}
+		w.Close()
+		// 重试超过2次之后武断的认为所有链接都需要重连
+		if i >= 2 {
+			w.p.closeAllClient()
+		}
+
+		t := i
+		if t >= 5 {
+			t = 5
+		}
+
+		time.Sleep((1 << t) * time.Second)
+		w, _ = w.p.Get()
+
 	}
-	return res, err
+	return
 }
 
 // client的方法调用
@@ -93,10 +92,10 @@ func (w *WrappedClient) Call(name string, args ...interface{}) (response interfa
 	client := reflect.ValueOf(w.client)
 	method := client.MethodByName(name)
 	values := make([]reflect.Value, 0, len(args)+1)
-	if w.p.WithCommonHeader {
-		header := common.NewRequestHeader()
-		values = append(values, reflect.ValueOf(header))
-	}
+	// if w.p.WithCommonHeader {
+	//	header := common.NewRequestHeader()
+	//	values = append(values, reflect.ValueOf(header))
+	// }
 	for _, arg := range args {
 		values = append(values, reflect.ValueOf(arg))
 	}
@@ -138,8 +137,8 @@ type Pool struct {
 	//  是否阻塞
 	Wait bool
 	// 是否使用通用header
-	WithCommonHeader bool
-	MaxRetry         uint
+	// WithCommonHeader bool
+	MaxRetry uint
 	// mu protects fields defined below
 	mu   sync.Mutex
 	cond *sync.Cond
@@ -147,19 +146,6 @@ type Pool struct {
 	active int
 	// 存放空闲的client
 	idle list.List
-}
-
-func NewThriftPool(clientFactory interface{}, host []string,
-	framed bool, maxIdle int, maxRetry uint,
-	withCommonHeader bool) *Pool {
-	return &Pool{
-		ClientFactory:    clientFactory,
-		Framed:           framed,
-		Host:             host,
-		MaxIdle:          maxIdle,
-		MaxRetry:         maxRetry,
-		WithCommonHeader: withCommonHeader, //默认下支持多个头部
-	}
 }
 
 // release decrements the active count and signals waiters. The caller must
@@ -218,7 +204,7 @@ func (p *Pool) newThriftClient() (thriftClient ThriftClient, err error) {
 
 // 关掉所有资源时pool不可用
 func (p *Pool) closeAllClient() {
-	log.Println("now close all the client")
+	log.Println("now close all clients")
 	p.mu.Lock()
 	for {
 		e := p.idle.Back()
@@ -246,14 +232,16 @@ func (p *Pool) Get() (*WrappedClient, error) {
 			if e == nil {
 				break
 			}
-			p.idle.Remove(e)
-			// 维护一个引用计数
-			client := e.Value.(*WrappedClient)
-			client.borrowNum += 1
+			value := p.idle.Remove(e)
 			p.mu.Unlock()
-			//检测获取的client是否有异常，判断标准为client.clinet 不为空
+
+			// 维护一个引用计数
+			client := value.(*WrappedClient)
+			client.borrowNum += 1
+
 			//检测client是否达到最大的调用次数，如果超过，就扔掉
-			if client.client == nil || client.borrowNum >= 20 {
+			if client.borrowNum >= 20 {
+				closeTransport(client.client)
 				p.mu.Lock()
 				p.release()
 				continue
@@ -298,14 +286,16 @@ func (p *Pool) Get() (*WrappedClient, error) {
 
 // 将client放回去, 上层调用会有可能出err，此时把这个client 关掉
 func (p *Pool) put(wrappedClient *WrappedClient) {
-	p.mu.Lock()
 	// 如果有错误直接丢弃掉
 	if wrappedClient.err != nil {
+		p.mu.Lock()
 		p.release()
 		p.mu.Unlock()
 		closeTransport(wrappedClient.client)
 		return
 	}
+
+	p.mu.Lock()
 	// 放入到pool中
 	p.idle.PushFront(wrappedClient)
 	if p.idle.Len() <= p.MaxIdle {
@@ -316,10 +306,10 @@ func (p *Pool) put(wrappedClient *WrappedClient) {
 		return
 	}
 	// 如果超长就扔掉最后一个
-	wrappedClient = p.idle.Remove(p.idle.Back()).(*WrappedClient)
+	clientLast := p.idle.Remove(p.idle.Back()).(*WrappedClient)
 	p.release()
 	p.mu.Unlock()
-	closeTransport(wrappedClient.client)
+	closeTransport(clientLast.client)
 	return
 }
 
@@ -345,16 +335,18 @@ func RegisterPool(poolname string, clientFactory interface{}) {
 	maxRetry, _ := config.GlobalConfiger.Int(
 		fmt.Sprintf("%s::max_retry", field))
 
-	withCommonHeader, _ := config.GlobalConfiger.Bool(
-		fmt.Sprintf("%s::with_common_header", field))
+	maxActive, _ := config.GlobalConfiger.Int(fmt.Sprintf("%s::max_active", field))
+	wait, _ := config.GlobalConfiger.Bool(fmt.Sprintf("%s::wait", field))
 
-	GlobalThriftPool[poolname] = NewThriftPool(
-		clientFactory,
-		hosts,
-		framed,
-		maxIdle,
-		uint(maxRetry),
-		withCommonHeader)
+	GlobalThriftPool[poolname] = &Pool{
+		ClientFactory: clientFactory,
+		Framed:        framed,
+		Host:          hosts,
+		MaxIdle:       maxIdle,
+		MaxRetry:      uint(maxRetry),
+		MaxActive:     maxActive,
+		Wait:          wait,
+	}
 
 }
 

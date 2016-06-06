@@ -47,7 +47,7 @@ func (config *YamlConfig) Strings(nodeName string) []string {
 	node := config.getNode(nodeName)
 	res, err := node.Array()
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	result := make([]string, 0, len(res))
 	for _, item := range res {
@@ -65,7 +65,7 @@ func (config *YamlConfig) Ints(nodeName string) ([]int, error) {
 	node := config.getNode(nodeName)
 	res, err := node.Array()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	result := make([]int, 0, len(res))
@@ -91,7 +91,7 @@ func (config *YamlConfig) Bools(nodeName string) ([]bool, error) {
 	node := config.getNode(nodeName)
 	res, err := node.Array()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	result := make([]bool, 0, len(res))
@@ -104,7 +104,7 @@ func (config *YamlConfig) Bools(nodeName string) ([]bool, error) {
 func (config *YamlConfig) Map(nodeName string) (map[string]interface{}, error) {
 	res, err := config.getNode(nodeName).Map()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return mapConvert(res), nil
 }
@@ -114,7 +114,7 @@ func (config *YamlConfig) Map(nodeName string) (map[string]interface{}, error) {
 func (config *YamlConfig) Maps(nodeName string) ([]map[string]interface{}, error) {
 	res, err := config.getNode(nodeName).Array()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	result := make([]map[string]interface{}, 0, len(res))
 	for _, item := range res {

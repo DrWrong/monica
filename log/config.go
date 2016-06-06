@@ -74,12 +74,16 @@ func InitLogger(handlerOptions []*HandlerOption, loggerOption []*LoggerOption) {
 		option.InitLogger()
 	}
 	initialized = true
+
 }
 
-func InitLoggerFromConfigure(configure config.Configer) {
+func InitLoggerFromConfigure(configure config.Configer) error {
+	defer func() {
+		initialized = true
+	}()
 	handlersConfig, err := configure.Maps("log::handlers")
 	if err != nil {
-		panic(err)
+		return err
 	}
 	handlerOptions := make([]*HandlerOption, 0, len(handlersConfig))
 	for _, config := range handlersConfig {
@@ -93,7 +97,7 @@ func InitLoggerFromConfigure(configure config.Configer) {
 
 	loggerConfig, err := configure.Maps("log::loggers")
 	if err != nil {
-		panic(err)
+		return err
 	}
 	loggerOptions := make([]*LoggerOption, 0, len(loggerConfig))
 	for _, config := range loggerConfig {
@@ -112,6 +116,7 @@ func InitLoggerFromConfigure(configure config.Configer) {
 		})
 	}
 	InitLogger(handlerOptions, loggerOptions)
+	return nil
 }
 
 func ConfigFromFile(filename string) {
