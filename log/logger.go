@@ -12,7 +12,6 @@ const formatter = `{{.Time.String }}  {{.Level.String }} {{.FileName }} {{.FuncN
 var (
 	loggerMap          map[string]*MonicaLogger
 	propagateLoggerMap map[string][]*MonicaLogger
-	rootLogger         *MonicaLogger
 	initialized        bool
 )
 
@@ -33,6 +32,10 @@ func GetLogger(name string) *MonicaLogger {
 		}
 		name = path.Dir(name)
 	}
+}
+
+func getRootLogger() *MonicaLogger {
+	return GetLogger("/")
 }
 
 func getParentLoggers(name string) []*MonicaLogger {
@@ -65,43 +68,43 @@ func getParentLoggersCache(name string) []*MonicaLogger {
 }
 
 func Debug(msg string) {
-	rootLogger.Debug(msg)
+	getRootLogger().Debug(msg)
 }
 
 func Debugf(formatter string, args ...interface{}) {
-	rootLogger.Debugf(formatter, args...)
+	getRootLogger().Debugf(formatter, args...)
 }
 
 func Info(msg string) {
-	rootLogger.Info(msg)
+	getRootLogger().Info(msg)
 }
 
 func Infof(formatter string, args ...interface{}) {
-	rootLogger.Infof(formatter, args...)
+	getRootLogger().Infof(formatter, args...)
 }
 
 func Warn(msg string) {
-	rootLogger.Warn(msg)
+	getRootLogger().Warn(msg)
 }
 
 func Warnf(formatter string, args ...interface{}) {
-	rootLogger.Warnf(formatter, args...)
+	getRootLogger().Warnf(formatter, args...)
 }
 
 func Error(msg string) {
-	rootLogger.Error(msg)
+	getRootLogger().Error(msg)
 }
 
 func Errorf(formatter string, args ...interface{}) {
-	rootLogger.Errorf(formatter, args...)
+	getRootLogger().Errorf(formatter, args...)
 }
 
 func Fatal(msg string) {
-	rootLogger.Fatal(msg)
+	getRootLogger().Fatal(msg)
 }
 
 func Fatalf(formatter string, args ...interface{}) {
-	rootLogger.Fatalf(formatter, args...)
+	getRootLogger().Fatalf(formatter, args...)
 }
 
 type MonicaLogger struct {
@@ -182,9 +185,10 @@ func (logger *MonicaLogger) Fatalf(format string, args ...interface{}) {
 }
 
 func init() {
+	println("logger init called")
 	propagateLoggerMap = make(map[string][]*MonicaLogger, 0)
 	handler, _ := NewFileHandler("/dev/stdout", formatter)
-	rootLogger = &MonicaLogger{
+	rootLogger := &MonicaLogger{
 		handlers:   []Handler{NewThreadSafeHandler(handler)},
 		level:      DebugLevel,
 		loggerName: "/",
