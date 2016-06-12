@@ -185,7 +185,6 @@ func (logger *MonicaLogger) Fatalf(format string, args ...interface{}) {
 }
 
 func init() {
-	println("logger init called")
 	propagateLoggerMap = make(map[string][]*MonicaLogger, 0)
 	handler, _ := NewFileHandler("/dev/stdout", formatter)
 	rootLogger := &MonicaLogger{
