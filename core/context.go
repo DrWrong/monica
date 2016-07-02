@@ -107,6 +107,13 @@ func (c *Context) Render(data []byte) {
 	c.stopProcess = true
 }
 
+// when error response 500
+func (c *Context) ErrorResponse(err error) {
+	c.Resp.Write([]byte(err.Error()))
+	c.Resp.WriteHeader(500)
+	c.Stop()
+}
+
 // get Cookie
 // try get cookie from cookie itself
 // if cookie not support for example: app rest then use query
