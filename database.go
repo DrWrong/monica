@@ -8,6 +8,7 @@ import (
 	"github.com/astaxie/beego/orm"
 	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -20,21 +21,24 @@ func init() {
 	dbLogger = log.GetLogger("/monica/database")
 }
 
-
-// init beego `orm` config
-// monica use beego's orm defaultly
-// however we set the `DefaultRowsLimit` to -1 here
-// the function read config from `default::mysql` part of yaml file
-func InitDb() {
+func initDb(dbType string) {
 	orm.DefaultRowsLimit = -1
-	orm.RegisterDriver("mysql", orm.DRMySQL)
+	switch dbType {
+	case "mysql":
+		orm.RegisterDriver("mysql", orm.DRMySQL)
+	case "postgres":
+		orm.RegisterDriver("postgres", orm.DRPostgres)
+	default:
+		panic("not specific db Type")
+
+	}
 	var initOk bool
-	configerMap, _ := config.GlobalConfiger.Map("mysql")
+	configerMap, _ := config.GlobalConfiger.Map(dbType)
 	for key, value := range configerMap {
 		if key == "default" {
 			initOk = true
 		}
-		if err := orm.RegisterDataBase(key, "mysql", value.(string)); err != nil {
+		if err := orm.RegisterDataBase(key, dbType, value.(string)); err != nil {
 			panic(err)
 		}
 	}
@@ -47,6 +51,20 @@ func InitDb() {
 		orm.Debug = true
 	}
 
+}
+
+
+// init beego `orm` config
+// monica use beego's orm defaultly
+// however we set the `DefaultRowsLimit` to -1 here
+// the function read config from `default::mysql` part of yaml file
+func InitDb() {
+	initDb("mysql")
+}
+
+
+func InitPostgres() {
+	initDb("postgres")
 }
 
 // init redis
