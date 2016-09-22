@@ -145,11 +145,15 @@ func (p *JSONProtocol) WriteFieldEnd() error {
 func (p *JSONProtocol) WriteFieldStop() error { return nil }
 
 func (p *JSONProtocol) WriteMapBegin(keyType TType, valueType TType, size int) error {
+	if e :=  p.OutputObjectBegin(); e != nil {
+		return e
+	}
 	return nil
+
 }
 
 func (p *JSONProtocol) WriteMapEnd() error {
-	return p.OutputListEnd()
+	return p.OutputObjectEnd()
 }
 
 func (p *JSONProtocol) WriteListBegin(elemType TType, size int) error {
