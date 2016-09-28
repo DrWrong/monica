@@ -44,6 +44,9 @@ func init() {
 	bootStrapLogger = log.GetLogger("/monica/bootstrap")
 	initDefaultLang()
 	go registerSignalHandler()
+
+	// reset beego validation
+
 }
 
 func registerSignalHandler() {

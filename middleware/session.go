@@ -26,7 +26,8 @@ type Sessioner interface {
 	Get(string) (interface{}, error)
 	Delete(string) error
 	ID() string
-}
+	Flush() error
+ }
 
 type Provider interface {
 	Init(map[string]interface{}) error
@@ -261,5 +262,12 @@ func (session *RedisSessioner) Delete(key string) error {
 	conn := session.redisPool.Get()
 	defer conn.Close()
 	conn.Send("HDEL", getRedisKey(session.sid), key)
+	return conn.Flush()
+}
+
+func (session RedisSessioner) Flush() error {
+	conn := session.redisPool.Get()
+	defer conn.Close()
+	conn.Send("DEL", getRedisKey(session.sid))
 	return conn.Flush()
 }
