@@ -91,13 +91,23 @@ func (w *WrappedClient) Call(name string, args ...interface{}) (response interfa
 	}
 	client := reflect.ValueOf(w.client)
 	method := client.MethodByName(name)
+
+	funcType := method.Type()
 	values := make([]reflect.Value, 0, len(args)+1)
 	// if w.p.WithCommonHeader {
 	//	header := common.NewRequestHeader()
 	//	values = append(values, reflect.ValueOf(header))
 	// }
-	for _, arg := range args {
-		values = append(values, reflect.ValueOf(arg))
+	for index, arg := range args {
+		var value reflect.Value
+		if arg == nil {
+			expectedType := funcType.In(index)
+			value = reflect.New(expectedType).Elem()
+		} else {
+			value = reflect.ValueOf(arg)
+		}
+
+		values = append(values, value)
 	}
 	// 返回结果不确定，可能是1个或者两个
 	res := method.Call(values)
@@ -325,12 +335,16 @@ func RegisterPool(poolname string, clientFactory interface{}) {
 
 	hosts := config.GlobalConfiger.Strings(
 		fmt.Sprintf("%s::hosts", field))
+	if len(hosts) == 0 {
+		panic(fmt.Sprintf("%s hosts cannot be empty", poolname))
+	}
 
 	framed, _ := config.GlobalConfiger.Bool(
 		fmt.Sprintf("%s::framed", field))
 
 	maxIdle, _ := config.GlobalConfiger.Int(
 		fmt.Sprintf("%s::max_idle", field))
+
 
 	maxRetry, _ := config.GlobalConfiger.Int(
 		fmt.Sprintf("%s::max_retry", field))
