@@ -194,7 +194,7 @@ func NewTimeRotator(when string, backupCount int, fileHandler *FileHandler) *Tim
 	case "H":
 		rotator.interval = 60 * 60
 		rotator.suffix = "2006-01-02_15"
-		rotator.extMatch = `^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(\.\w+)?$`
+		rotator.extMatch = `^\d{4}-\d{2}-\d{2}_\d{2}(\.\w+)?$`
 	case "D":
 		fallthrough
 	case "MIDNIGHT":
@@ -260,7 +260,11 @@ func (rotator *TimeRotator) doRollover() {
 }
 
 func (rotator *TimeRotator) getFilesToDelete() []string {
+
 	dirName, baseName := filepath.Split(rotator.baseFileName)
+	if dirName == "" {
+		dirName = "."
+	}
 	fileInfos, _ := ioutil.ReadDir(dirName)
 	result := make([]string, 0, 0)
 	prefix := baseName + "."

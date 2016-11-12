@@ -19,8 +19,8 @@ func TestFileHanler(t *testing.T) {
 	}
 }
 
-func TestTImeRotatingFileHandler(t *testing.T) {
-	handler, err := NewTimeRotatingFileHandler("handler_test_time.log", formatter, "S", 10)
+func TestTimeRotatingFileHandler(t *testing.T) {
+	handler, err := NewTimeRotatingFileHandler("handler_test_time.log", formatter, "S", 1)
 	if err != nil {
 		t.Error(err)
 	}
