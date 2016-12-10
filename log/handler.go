@@ -79,7 +79,7 @@ func NewFileHandlerFactory(args map[string]interface{}) (Handler, error) {
 	if !ok {
 		return nil, errors.New("baseFileName not exist in args")
 	}
-	baseFileName := path.Join(os.Getenv("MONIC_RUNDIR"), args1.(string))
+	baseFileName := path.Join(os.Getenv("MONICA_RUNDIR"), args1.(string))
 	formatter, ok := args["formatter"]
 	if !ok {
 		return nil, errors.New("formatter not exist in args")
@@ -139,7 +139,7 @@ func NewTimeRotatingFileHandlerFactory(args map[string]interface{}) (Handler, er
 	if !ok {
 		return nil, errors.New("baseFileName not exist in args")
 	}
-	baseFileName := path.Join(os.Getenv("MONIC_RUNDIR"), args1.(string))
+	baseFileName := path.Join(os.Getenv("MONICA_RUNDIR"), args1.(string))
 	formatter, ok := args["formatter"]
 	if !ok {
 		return nil, errors.New("formatter not exist in args")
