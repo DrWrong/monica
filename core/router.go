@@ -30,9 +30,9 @@ func (node *UrlNode) isLeaf() bool {
 func newProcessor(handlers []Handler, kwargs map[string]string) func(http.ResponseWriter, *http.Request) {
 	return func(resp http.ResponseWriter, req *http.Request) {
 		c := NewContext(resp, req)
-		c.handlers = handlers
+		c.Handlers = handlers
 		c.Kwargs = kwargs
-		c.run()
+		c.Run()
 	}
 
 }

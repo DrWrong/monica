@@ -41,7 +41,7 @@ func isPrivateIp(ip net.IP) bool {
 // it provide a context for each request
 type Context struct {
 	inject.Injector
-	handlers []Handler
+	Handlers []Handler
 	index    int
 	*http.Request
 	Resp          http.ResponseWriter
@@ -137,7 +137,7 @@ func (c *Context) Stop() {
 // yield another handler
 func (c *Context) Next() {
 	c.index += 1
-	c.run()
+	c.Run()
 }
 
 func (c *Context) Bind(formStruct interface{}, fields ...string) error {
@@ -157,14 +157,14 @@ func (c *Context) Bind(formStruct interface{}, fields ...string) error {
 	return errors.New(res)
 }
 
-func (c *Context) run() {
+func (c *Context) Run() {
 	c.parseFormOnce.Do(c.parseForm)
-	for c.index < len(c.handlers) {
+	for c.index < len(c.Handlers) {
 		if c.stopProcess {
 			break
 		}
 
-		_, err := c.Invoke(c.handlers[c.index])
+		_, err := c.Invoke(c.Handlers[c.index])
 
 		if err != nil {
 			panic(err)
