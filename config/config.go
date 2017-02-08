@@ -34,14 +34,14 @@ type ServerOption struct {
 	URLPrefix  string
 }
 
-// get a sigleton of gloabl configuration
+// get a sigleton of global configuration
 // it will panic if global configer is null
 func GetGlobalServerOption() *ServerOption {
-	once.Do(initGloablServerOption)
+	once.Do(initGlobalServerOption)
 	return globalServerOption
 }
 
-func initGloablServerOption() {
+func initGlobalServerOption() {
 	globalServerOption = &ServerOption{
 		ServerPort: 8200,
 		ServerMode: "http",

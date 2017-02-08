@@ -71,13 +71,13 @@ func registerSignalHandler() {
 // bootstrap firstly call the customizedConfig to do some init actions required by the upper programs
 // then it start web server
 func BootStrap(customizedConfig func()) {
-	initGloabl(customizedConfig)
+	initGlobal(customizedConfig)
 	// now start server
 	server := core.NewServer()
 	server.Run()
 }
 
-func initGloabl(customizedConfig func()) {
+func initGlobal(customizedConfig func()) {
 	bootStrapLogger.Debug("start init global config")
 	if customizedConfig != nil {
 		customizedConfig()
@@ -88,7 +88,7 @@ func initGloabl(customizedConfig func()) {
 
 // BootStrap a thrift Server
 func BootStrapThriftServer(processor thrift.TProcessor, customizedConfig func()) {
-	initGloabl(customizedConfig)
+	initGlobal(customizedConfig)
 
 	transportFactory := thrift.NewTFramedTransportFactory(thrift.NewTTransportFactory())
 	protocolFactory := thrift.NewTBinaryProtocolFactoryDefault()
