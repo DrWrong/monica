@@ -10,8 +10,6 @@
 + [logger](logger) 一个类python的日志实现
 + [config](config) 一个配置文件的管理包
 + [webserver](webserver) 简单封装了一下`macaron` 用来扩展以支持**FastCGI**协议用于和旧的PHPUI进行无缝连接
-+ [dm303_go](dm303_go) go 版本的dm303
-+ [thrift](thrift) 将thrift代码拷贝了过来
 + [thriftext](thriftext) thriftext的扩展
 + [middleware](middleware) 中间件 用于web服务中的通用中间件
 
