@@ -2,7 +2,7 @@
 
 ## 使用方式
 
-`go get -insecure git.domob-inc.cn/domob_pad/monica.git`
+`go get github.com/DrWrong/monica`
 
  
 ## 包含模块
