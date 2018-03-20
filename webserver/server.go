@@ -6,9 +6,8 @@ import (
 	"net/http"
 	"net/http/fcgi"
 
+	"github.com/DrWrong/monica/middleware"
 	"gopkg.in/macaron.v1"
-
-	"git.domob-inc.cn/domob_pad/monica.git/middleware"
 )
 
 type ServerConfig struct {

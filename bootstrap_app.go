@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"git.domob-inc.cn/domob_pad/monica.git/config"
-	"git.domob-inc.cn/domob_pad/monica.git/logger"
+	"github.com/DrWrong/monica/config"
+	"github.com/DrWrong/monica/logger"
 	"gopkg.in/urfave/cli.v2"
 )
 

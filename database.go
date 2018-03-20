@@ -3,8 +3,7 @@ package monica
 import (
 	"time"
 
-	"git.domob-inc.cn/domob_pad/monica.git/config"
-
+	"github.com/DrWrong/monica/config"
 	"github.com/astaxie/beego/orm"
 	"github.com/garyburd/redigo/redis"
 

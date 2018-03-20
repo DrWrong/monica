@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"git.domob-inc.cn/domob_pad/monica.git/thrift"
+	"git.apache.org/thrift.git/lib/go/thrift"
 )
 
 var (
@@ -328,7 +328,6 @@ func (p *Pool) CallWithRetry(name string, args ...interface{}) (res interface{},
 	res, err = client.CallWithRetry(name, args...)
 	return
 }
-
 
 func init() {
 	// 种子只初始化一次，用以保证生成的是随机化序列

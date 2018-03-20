@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"log"
 
-	"git.domob-inc.cn/domob_pad/monica.git/config"
-	"git.domob-inc.cn/domob_pad/monica.git/dm303_go"
-	"git.domob-inc.cn/domob_pad/monica.git/logger"
-	"git.domob-inc.cn/domob_pad/monica.git/thrift"
-	"git.domob-inc.cn/domob_pad/monica.git/thriftext"
-	"git.domob-inc.cn/domob_pad/monica.git/webserver"
+	"github.com/DrWrong/monica/config"
+	"github.com/DrWrong/monica/logger"
+	"github.com/DrWrong/monica/thriftext"
+	"github.com/DrWrong/monica/webserver"
 )
 
 var (
