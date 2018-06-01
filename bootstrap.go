@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	"git.apache.org/thrift.git/lib/go/thrift"
 	"github.com/DrWrong/monica/config"
 	"github.com/DrWrong/monica/logger"
 	"github.com/DrWrong/monica/thriftext"
@@ -90,7 +91,7 @@ func BootStrapWeb(postInitFunc func()) {
 	WebServer.Run()
 }
 
-// 起动thrift server
+// BooststrapThrift 起动thrift server
 func BootstrapThrift(processor thrift.TProcessor) {
 	port, err := config.Int("serverport")
 	if err != nil {
@@ -114,13 +115,4 @@ func BootstrapThriftWithPort(processor thrift.TProcessor, port int) {
 		panic(err)
 	}
 
-}
-
-func StartDm303WhenNeccssary() {
-	config, err := config.Map("dm303")
-	if err != nil {
-		return
-	}
-
-	go dm303_go.Start(config["port"].(int), config["service_name"].(string))
 }

@@ -191,7 +191,7 @@ func (p *Pool) newThriftClient() (thriftClient ThriftClient, err error) {
 		if err != nil {
 			continue
 		}
-		transport = transportFactory.GetTransport(transport)
+		transport, _ = transportFactory.GetTransport(transport)
 		err = transport.Open()
 		if err == nil {
 			break

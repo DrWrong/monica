@@ -168,9 +168,6 @@ func (app *MonicaApp) cliContextRedayHook(c *cli.Context) error {
 	if app.daemon {
 		app.writePidFile()
 	}
-	if app.globalConfigInited {
-		StartDm303WhenNeccssary()
-	}
 	go app.handleSigIntAndTerm()
 	return nil
 }
